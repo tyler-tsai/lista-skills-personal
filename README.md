@@ -7,6 +7,7 @@ Agent skills for [Lista Lending](https://lista.org/lending) — daily DeFi workf
 A set of agent skills (slash commands) that give any LLM tool a full DeFi analyst for Lista Lending. Connect the MCP server once, install the skill, and your agent can answer questions about your positions, markets, and yield opportunities using live on-chain data — no custom backend required.
 
 Coverage:
+
 - **Position Report** — collateral, debt, health factor, LTV, liquidation price, recommendations
 - **Market Overview** — TVL, lending rates, top vaults, high-utilization markets
 - **Yield Opportunities** — best deposit APY across vaults
@@ -16,8 +17,8 @@ Coverage:
 
 ## Skills
 
-| Command | Description |
-|---|---|
+| Command  | Description                                                                                                    |
+| -------- | -------------------------------------------------------------------------------------------------------------- |
 | `/lista` | Lista Lending assistant: position report, market overview, yield scan, risk check, daily digest, loop strategy |
 
 ---
@@ -86,6 +87,7 @@ SKILL.md uses progressive disclosure: it's a compact orchestrator that dispatche
 ## About Lista Lending
 
 Lista Lending (powered by the Moolah protocol) is a permissionless lending protocol on BNB Smart Chain. It features:
+
 - **Isolated markets** — each market has its own collateral, oracle, and risk params
 - **Curated vaults** — ERC4626 vaults that aggregate capital across markets
 - **Smart Lending** — collateral doubles as DEX liquidity, earning trading fees

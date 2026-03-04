@@ -1,0 +1,25 @@
+{
+  "name": "@lista-dao/wallet-connect-skill",
+  "version": "1.0.0",
+  "description": "WalletConnect integration for Lista Lending skills (EVM only)",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/cli.ts",
+    "check": "tsx src/cli.ts --help",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "cli": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@walletconnect/sign-client": "^2.17.0",
+    "@walletconnect/utils": "^2.17.0",
+    "qrcode": "^1.5.4",
+    "tsx": "^4.19.0",
+    "viem": "^2.45.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/qrcode": "^1.5.5",
+    "typescript": "^5.7.0"
+  }
+}

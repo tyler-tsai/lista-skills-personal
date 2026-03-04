@@ -1,0 +1,9 @@
+# Dependencies
+node_modules/
+
+# TypeScript output
+dist/
+
+# Session data (SECURITY: never commit!)
+# Sessions are stored in ~/.agent-wallet/ not here, but just in case
+sessions.json
