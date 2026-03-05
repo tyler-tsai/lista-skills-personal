@@ -8,12 +8,16 @@ import { mainnet, bsc } from "viem/chains";
 import type { Chain } from "viem";
 import { loadSessions } from "../storage.js";
 import { requireSession, findAccount, parseAccount } from "../helpers.js";
+import {
+  getRpcCandidatesForChain,
+  type SupportedEvmChainId,
+} from "../rpc.js";
 import { getTokensForChain } from "./tokens.js";
 import type { ParsedArgs, BalanceResult } from "../types.js";
 
-const EVM_CHAINS: Record<string, { chain: Chain; rpc: string; native: string }> = {
-  "eip155:1": { chain: mainnet, rpc: "https://eth.llamarpc.com", native: "ETH" },
-  "eip155:56": { chain: bsc, rpc: "https://bsc-dataseed.binance.org", native: "BNB" },
+const EVM_CHAINS: Record<SupportedEvmChainId, { chain: Chain; native: string }> = {
+  "eip155:1": { chain: mainnet, native: "ETH" },
+  "eip155:56": { chain: bsc, native: "BNB" },
 };
 
 const erc20Abi = [
@@ -27,27 +31,59 @@ const erc20Abi = [
 ] as const;
 
 async function getEvmBalance(address: string, chainId: string): Promise<BalanceResult> {
-  const chainConfig = EVM_CHAINS[chainId];
+  if (chainId !== "eip155:1" && chainId !== "eip155:56") {
+    return {
+      chain: chainId,
+      address,
+      balances: [],
+      error: `Unsupported chain: ${chainId}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.`,
+    };
+  }
+
+  const evmChain = chainId as SupportedEvmChainId;
+  const chainConfig = EVM_CHAINS[evmChain];
   if (!chainConfig) {
     return { chain: chainId, address, balances: [], error: `Unsupported chain: ${chainId}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.` };
   }
-
-  const client = createPublicClient({
-    chain: chainConfig.chain,
-    transport: http(chainConfig.rpc),
-  });
-
   const result: BalanceResult = { chain: chainId, address, balances: [] };
+  const rpcCandidates = getRpcCandidatesForChain(evmChain);
+  const rpcErrors: string[] = [];
 
-  try {
-    const rawBalance = await client.getBalance({ address: address as `0x${string}` });
+  let client: ReturnType<typeof createPublicClient> | null = null;
+
+  for (const candidate of rpcCandidates) {
+    const candidateClient = createPublicClient({
+      chain: chainConfig.chain,
+      transport: http(candidate.rpcUrl),
+    });
+
+    try {
+      const rawBalance = await candidateClient.getBalance({
+        address: address as `0x${string}`,
+      });
+      result.balances.push({
+        token: chainConfig.native,
+        balance: formatEther(rawBalance),
+        raw: rawBalance.toString(),
+      });
+      client = candidateClient;
+      break;
+    } catch (err) {
+      rpcErrors.push(
+        `[${candidate.source}] ${candidate.rpcUrl}: ${(err as Error).message}`
+      );
+    }
+  }
+
+  if (!client) {
     result.balances.push({
       token: chainConfig.native,
-      balance: formatEther(rawBalance),
-      raw: rawBalance.toString(),
+      error:
+        rpcErrors.length > 0
+          ? `All RPC nodes failed: ${rpcErrors.join(" | ")}`
+          : "No RPC candidates available",
     });
-  } catch (err) {
-    result.balances.push({ token: chainConfig.native, error: (err as Error).message });
+    return result;
   }
 
   const tokens = getTokensForChain(chainId);

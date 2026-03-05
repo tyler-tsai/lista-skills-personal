@@ -1,9 +1,16 @@
 ---
 name: wallet-connect
+version: 1.0.0
+repository: https://github.com/lista-dao/lista-skills
 description: Connect to crypto wallets via WalletConnect v2. Use when asked to connect wallet, pair wallet, sign messages, or send transactions on Ethereum or BSC.
 ---
 
 # Wallet Connect Skill
+
+> **Version:** 1.0.0
+> **Status:** Pre-release (not public, skip registry verification)
+> **Verify:** `npx tsx src/cli.ts version`
+> **If outdated:** `npm install && npm run build`
 
 Connect to user's crypto wallet via WalletConnect v2. Supports Ethereum and BSC (for Lista Lending).
 
@@ -161,6 +168,9 @@ node skills/wallet-connect/dist/cli.js send-tx --topic <topic> --chain eip155:1 
 ```
 
 ### Raw Contract Call (for DeFi operations)
+
+**Transaction Simulation:** The `call` command simulates transactions using `eth_call` before sending. If the simulation detects a revert, the transaction is NOT sent, preventing gas loss. Use `--no-simulate` to skip simulation (not recommended).
+
 ```bash
 # Approve USDT for Lista Lending vault
 node skills/wallet-connect/dist/cli.js call --topic <topic> --chain eip155:56 \
@@ -176,8 +186,14 @@ node skills/wallet-connect/dist/cli.js call --topic <topic> --chain eip155:56 \
 # Custom gas limit
 node skills/wallet-connect/dist/cli.js call --topic <topic> --chain eip155:56 \
   --to 0xCONTRACT --data 0xCALLDATA --gas 500000
+
+# Skip simulation (not recommended - may waste gas on reverts)
+node skills/wallet-connect/dist/cli.js call --topic <topic> --chain eip155:56 \
+  --to 0xCONTRACT --data 0xCALLDATA --no-simulate
 ```
 Output: `{ status, txHash, chain, from, to, data, value, explorer }`
+
+On simulation failure: `{ status: "simulation_failed", error, revertReason, hint }`
 
 **Parameters:**
 - `--to` — Contract address (required)
@@ -185,6 +201,7 @@ Output: `{ status, txHash, chain, from, to, data, value, explorer }`
 - `--value` — Native token value: "1.5" (ether), "1000000000000000000" (wei), or "0x..." (hex wei)
 - `--gas` — Gas limit (optional)
 - `--gasPrice` — Gas price in wei (optional)
+- `--no-simulate` — Skip transaction simulation (not recommended)
 
 ### Sign Message
 ```bash

@@ -16,12 +16,21 @@
  *   delete-session   Remove a saved session
  *   sign-typed-data  Sign EIP-712 typed data
  *   health           Ping session(s) to check liveness (--all, --clean)
+ *   version          Show version information
  */
 
 import { parseArgs } from "util";
 import { existsSync, readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+
+// Read version from package.json (single source of truth)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkgPath = resolve(__dirname, "../package.json");
+const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+export const SKILL_VERSION = pkg.version;
+export const SKILL_NAME = pkg.name;
+
 import { cmdPair } from "./commands/pair.js";
 import { cmdAuth } from "./commands/auth.js";
 import { cmdSign } from "./commands/sign.js";
@@ -132,15 +141,21 @@ const { positionals, values } = parseArgs({
     all: { type: "boolean" },
     clean: { type: "boolean" },
     open: { type: "boolean" },
+    "no-simulate": { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
 
 const command = positionals[0];
-const args = values as ParsedArgs;
+const args = {
+  ...values,
+  noSimulate: values["no-simulate"],
+} as ParsedArgs;
 
 if (!command || args.help) {
-  console.log(`Usage: cli.ts <command> [options]
+  console.log(`${SKILL_NAME} v${SKILL_VERSION}
+
+Usage: cli.ts <command> [options]
 
 Commands:
   pair             Create pairing session (--chains eip155:56,eip155:1)
@@ -149,7 +164,7 @@ Commands:
   sign             Sign message (--topic <topic> | --address <addr>) --message <msg>
   sign-typed-data  Sign EIP-712 typed data (--topic | --address) --data <json|@file> [--chain eip155:1]
   send-tx          Send transaction (--topic <topic> | --address <addr>) --chain <chain> --to <addr> --amount <n> [--token USDC]
-  call             Raw contract call (--topic | --address) --to <contract> --data <calldata> [--value <wei>] [--gas <limit>]
+  call             Raw contract call (--topic | --address) --to <contract> --data <calldata> [--value <wei>] [--gas <limit>] [--no-simulate]
   balance          Check wallet balances (--topic <topic> | --address <addr> [--chain <chain>])
   tokens           List supported tokens for a chain (--chain <chain>)
   sessions         List all sessions (raw JSON)
@@ -157,12 +172,14 @@ Commands:
   whoami           Show account info (--topic <topic> | --address <addr>)
   delete-session   Remove a saved session (--topic <topic> | --address <addr>)
   health           Ping session to check liveness (--topic | --address | --all) [--clean]
+  version          Show version information
 
 Options:
   --address <0x...>  Select session by wallet address (case-insensitive)
   --all              (health) Ping all sessions
   --clean            (health) Remove dead sessions from storage
   --open             (pair) Force open QR in system viewer (for agent environments)
+  --no-simulate      (call) Skip transaction simulation (not recommended)
 
 Supported Chains:
   eip155:1      Ethereum Mainnet
@@ -203,6 +220,15 @@ const commands: Record<string, (args: ParsedArgs) => Promise<void>> = {
   whoami: cmdWhoami,
   "delete-session": cmdDeleteSession,
   health: cmdHealth,
+  version: async () => {
+    console.log(
+      JSON.stringify({
+        skill: SKILL_NAME,
+        version: SKILL_VERSION,
+        hint: "If version mismatch, run: npm install && npm run build",
+      })
+    );
+  },
 };
 
 if (!commands[command]) {

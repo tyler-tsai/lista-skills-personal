@@ -47,6 +47,7 @@ export interface ParsedArgs {
   clean?: boolean;
   help?: boolean;
   open?: boolean;
+  noSimulate?: boolean;
 }
 
 export interface Eip712TypeEntry {

@@ -1,10 +1,20 @@
 /**
  * Raw contract call command -- send arbitrary transactions with custom calldata.
  * Used by lending skills for approve, deposit, withdraw, repay, etc.
+ *
+ * Simulates transactions by default using eth_call before sending.
+ * Use --no-simulate to skip simulation (not recommended).
  */
 
+import { createPublicClient, http, type Chain, type Hex } from "viem";
+import { mainnet, bsc } from "viem/chains";
 import { getClient } from "../client.js";
 import { loadSessions } from "../storage.js";
+import {
+  getRpcCandidatesForChain,
+  type RpcSource,
+  type SupportedEvmChainId,
+} from "../rpc.js";
 import {
   requireSession,
   requireAccount,
@@ -18,6 +28,90 @@ const EXPLORER_URLS: Record<string, string> = {
   "eip155:1": "https://etherscan.io/tx/",
   "eip155:56": "https://bscscan.com/tx/",
 };
+
+const CHAIN_CONFIG: Record<SupportedEvmChainId, { chain: Chain }> = {
+  "eip155:1": { chain: mainnet },
+  "eip155:56": { chain: bsc },
+};
+
+/**
+ * Simulate transaction using eth_call before sending.
+ * Returns null if simulation succeeds, or error message if it fails.
+ */
+async function simulateTransaction(
+  chainId: SupportedEvmChainId,
+  tx: { from: string; to: string; data?: string; value?: string },
+  rpcCandidates: Array<{ rpcUrl: string; source: RpcSource }>
+): Promise<
+  | { success: true; rpcUrl: string; rpcSource: RpcSource }
+  | {
+      success: false;
+      error: string;
+      revertReason?: string;
+      attempts: Array<{ rpcUrl: string; source: RpcSource; error: string }>;
+    }
+> {
+  const config = CHAIN_CONFIG[chainId];
+  const attempts: Array<{ rpcUrl: string; source: RpcSource; error: string }> = [];
+
+  for (const candidate of rpcCandidates) {
+    const client = createPublicClient({
+      chain: config.chain,
+      transport: http(candidate.rpcUrl),
+    });
+
+    try {
+      await client.call({
+        account: tx.from as Hex,
+        to: tx.to as Hex,
+        data: tx.data as Hex | undefined,
+        value: tx.value ? BigInt(tx.value) : undefined,
+      });
+
+      return {
+        success: true,
+        rpcUrl: candidate.rpcUrl,
+        rpcSource: candidate.source,
+      };
+    } catch (err) {
+      const error = err as Error;
+      const message = error.message || String(err);
+      let revertReason: string | undefined;
+
+      if (message.includes("reverted")) {
+        const match = message.match(/reverted:?\s*(.+?)(?:\n|$)/i);
+        revertReason = match?.[1]?.trim();
+      }
+
+      attempts.push({
+        rpcUrl: candidate.rpcUrl,
+        source: candidate.source,
+        error: message,
+      });
+
+      // A true revert should not be retried on other RPC nodes.
+      if (revertReason) {
+        return {
+          success: false,
+          error: message,
+          revertReason,
+          attempts,
+        };
+      }
+    }
+  }
+
+  return {
+    success: false,
+    error:
+      attempts.length > 0
+        ? attempts
+            .map((a) => `[${a.source}] ${a.rpcUrl}: ${a.error}`)
+            .join(" | ")
+        : "Simulation failed with no RPC candidates",
+    attempts,
+  };
+}
 
 /**
  * Parse value input to hex wei.
@@ -68,6 +162,7 @@ export async function cmdCall(args: ParsedArgs): Promise<void> {
     }));
     process.exit(1);
   }
+  const evmChain = chain as SupportedEvmChainId;
 
   const client = await getClient();
   const sessionData = requireSession(loadSessions(), args.topic);
@@ -112,7 +207,7 @@ export async function cmdCall(args: ParsedArgs): Promise<void> {
   // Log transaction details for debugging
   console.error(JSON.stringify({
     action: "sending_raw_tx",
-    chain,
+    chain: evmChain,
     from,
     to: resolvedTo,
     data: tx.data ? `${tx.data.slice(0, 10)}...` : undefined,
@@ -120,23 +215,63 @@ export async function cmdCall(args: ParsedArgs): Promise<void> {
     gas: tx.gas,
   }));
 
+  // Simulate transaction first (unless --no-simulate is set)
+  if (!args.noSimulate) {
+    const rpcCandidates = getRpcCandidatesForChain(evmChain);
+    console.error(
+      JSON.stringify({
+        action: "simulating_tx",
+        rpcCandidates: rpcCandidates.map((candidate) => ({
+          rpcUrl: candidate.rpcUrl,
+          rpcSource: candidate.source,
+        })),
+      })
+    );
+
+    const simResult = await simulateTransaction(
+      evmChain,
+      { from, to: resolvedTo, data: tx.data, value: tx.value },
+      rpcCandidates
+    );
+
+    if (!simResult.success) {
+      console.log(JSON.stringify({
+        status: "simulation_failed",
+        error: simResult.error,
+        revertReason: simResult.revertReason,
+        attempts: simResult.attempts,
+        hint: "Transaction would revert on-chain. Use --no-simulate to force send (not recommended).",
+      }));
+      await client.core.relayer.transportClose().catch(() => {});
+      process.exit(1);
+    }
+
+    console.error(
+      JSON.stringify({
+        action: "simulation_passed",
+        rpcUrl: simResult.rpcUrl,
+        rpcSource: simResult.rpcSource,
+      })
+    );
+  }
+
   try {
     const txHash = await requestWithTimeout(client, {
       topic: args.topic,
-      chainId: chain,
+      chainId: evmChain,
       request: {
         method: "eth_sendTransaction",
         params: [tx],
       },
     });
 
-    const explorerUrl = EXPLORER_URLS[chain] || "";
+    const explorerUrl = EXPLORER_URLS[evmChain] || "";
 
     console.log(
       JSON.stringify({
         status: "sent",
         txHash,
-        chain,
+        chain: evmChain,
         from,
         to: resolvedTo,
         ...(resolvedTo !== args.to ? { ens: args.to } : {}),
