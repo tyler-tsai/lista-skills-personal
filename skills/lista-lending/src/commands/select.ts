@@ -26,6 +26,7 @@ import {
 
 // Zone constants for filtering
 const ZONE_SMART_LENDING = 3;
+const TERM_TYPE_FIXED = 1;
 
 export interface SelectArgs {
   vault?: string;
@@ -347,19 +348,33 @@ async function selectMarket(args: SelectArgs): Promise<void> {
   try {
     const sdk = getSDK();
 
-    // 1. Get market extra info
+    // 1. Get market info from API (includes zone metadata).
     console.error(
       JSON.stringify({ action: "fetching_market_info", market: marketId })
     );
-    const marketExtraInfo = await sdk.getMarketExtraInfo(chainId, marketId);
+    const marketInfo = await sdk.getMarketInfo(chainId, marketId);
+    const marketZone = marketInfo.zone;
+    const marketTermType = (marketInfo as { termType?: number }).termType;
 
     // Check if it's a SmartLending market (zone=3)
-    if (marketExtraInfo.zone === ZONE_SMART_LENDING) {
+    if (marketZone === ZONE_SMART_LENDING) {
       console.log(
         JSON.stringify({
           status: "error",
           reason: "unsupported_market_type",
           message: "SmartLending markets are not supported. Use regular markets only.",
+        })
+      );
+      process.exit(1);
+    }
+
+    // Check if it's a fixed-term market (termType=1)
+    if (marketTermType === TERM_TYPE_FIXED) {
+      console.log(
+        JSON.stringify({
+          status: "error",
+          reason: "unsupported_market_type",
+          message: "Fixed-term markets are not supported. Use regular markets only.",
         })
       );
       process.exit(1);
@@ -377,7 +392,8 @@ async function selectMarket(args: SelectArgs): Promise<void> {
       chain,
       collateralSymbol: userData.collateralInfo.symbol,
       loanSymbol: userData.loanInfo.symbol,
-      zone: marketExtraInfo.zone,
+      zone: marketZone,
+      termType: marketTermType,
     };
 
     // 4. Map position data

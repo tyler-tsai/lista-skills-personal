@@ -119,7 +119,7 @@ export async function cmdRepay(args: ParsedArgs): Promise<void> {
       types: steps.map((s: StepParam) => s.step),
     });
 
-    // 4. Execute steps via wallet-connect
+    // 4. Execute steps via lista-wallet-connect
     const results = await executeSteps(steps, {
       topic: walletTopic!,
       chain,

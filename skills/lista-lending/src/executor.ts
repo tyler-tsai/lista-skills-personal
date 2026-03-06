@@ -1,5 +1,5 @@
 /**
- * Transaction executor - bridges SDK steps to wallet-connect call command
+ * Transaction executor - bridges SDK steps to lista-wallet-connect call command
  */
 
 import { execSync } from "child_process";
@@ -18,7 +18,7 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WALLET_CONNECT_CLI = resolve(
   __dirname,
-  "../../wallet-connect/dist/cli.js"
+  "../../lista-wallet-connect/dist/cli.js"
 );
 
 const EXPLORER_URLS: Record<string, string> = {
@@ -145,7 +145,7 @@ export interface ExecuteOptions {
 }
 
 /**
- * Execute a single transaction step via wallet-connect
+ * Execute a single transaction step via lista-wallet-connect
  */
 export async function executeStep(
   step: StepParam,
@@ -190,7 +190,7 @@ export async function executeStep(
       },
     });
 
-    // Parse wallet-connect response (last line is JSON)
+    // Parse lista-wallet-connect response (last line is JSON)
     const lines = result.trim().split("\n");
     const lastLine = lines[lines.length - 1];
     const response = JSON.parse(lastLine);

@@ -1,5 +1,5 @@
 /**
- * Shared helpers for wallet-connect-skill (EVM only).
+ * Shared helpers for lista-wallet-connect-skill (EVM only).
  */
 
 import { parseAccountId } from "@walletconnect/utils";

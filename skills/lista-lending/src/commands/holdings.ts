@@ -4,12 +4,36 @@
 
 import { fetchMarketPositions, fetchUserPositions, fetchVaultPositions } from "../api.js";
 import { loadContext, setLastFilters } from "../context.js";
+import { getRpcConfig, SUPPORTED_CHAINS } from "../config.js";
 import type { HoldingsScope } from "../types/lista-api.js";
 import { isValidAddress } from "../utils/validators.js";
 
 export interface HoldingsArgs {
   address?: string;
   scope?: HoldingsScope;
+}
+
+function collectInvolvedChains(
+  scope: HoldingsScope,
+  vaults: Awaited<ReturnType<typeof fetchVaultPositions>>,
+  markets: Awaited<ReturnType<typeof fetchMarketPositions>>,
+  selectedVaultChain?: string,
+  selectedMarketChain?: string
+): string[] {
+  const chains = new Set<string>();
+  vaults.forEach((item) => chains.add(item.chain));
+  markets.forEach((item) => chains.add(item.chain));
+
+  if (chains.size === 0 && scope === "selected") {
+    if (selectedVaultChain) chains.add(selectedVaultChain);
+    if (selectedMarketChain) chains.add(selectedMarketChain);
+  }
+
+  if (chains.size === 0 && (scope === "all" || scope === "vault" || scope === "market")) {
+    SUPPORTED_CHAINS.forEach((chain) => chains.add(chain));
+  }
+
+  return Array.from(chains).filter((chain) => SUPPORTED_CHAINS.includes(chain));
 }
 
 export async function cmdHoldings(args: HoldingsArgs): Promise<void> {
@@ -120,6 +144,28 @@ export async function cmdHoldings(args: HoldingsArgs): Promise<void> {
             item.chain === ctx.selectedMarket!.chain
         );
       }
+    }
+
+    const involvedChains = collectInvolvedChains(
+      scope,
+      vaults,
+      markets,
+      ctx.selectedVault?.chain,
+      ctx.selectedMarket?.chain
+    );
+    const publicRpcChains = involvedChains.filter(
+      (chain) => getRpcConfig(chain).type === "public"
+    );
+
+    if (publicRpcChains.length > 0) {
+      console.error(
+        JSON.stringify({
+          notice: "Using free public RPC",
+          chains: publicRpcChains,
+          tip: "For faster speed, configure custom RPC with: npx tsx src/cli.ts config --set-rpc --chain <chain> --url <your-rpc-url>",
+          performance: "Queries may be slower with public endpoints",
+        })
+      );
     }
 
     setLastFilters({

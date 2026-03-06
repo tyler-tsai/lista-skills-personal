@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * wallet-connect-skill CLI entry point (EVM only).
+ * lista-wallet-connect-skill CLI entry point (EVM only).
  *
  * Commands:
  *   pair             Create a new pairing session

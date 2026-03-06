@@ -4,9 +4,15 @@
  */
 
 import { MoolahSDK } from "@lista-dao/moolah-lending-sdk";
-import { createPublicClient, http } from "viem";
+import { createPublicClient, fallback, http } from "viem";
 import { bsc, mainnet, type Chain } from "viem/chains";
-import { getRpcUrl, getChainId, SUPPORTED_CHAINS } from "./config.js";
+import {
+  getRpcUrl,
+  getRpcUrls,
+  getChainId,
+  getRpcConfig,
+  SUPPORTED_CHAINS,
+} from "./config.js";
 
 let sdkInstance: MoolahSDK | null = null;
 let sdkRpcUrls: Record<string, string> | null = null;
@@ -16,17 +22,32 @@ function parseIntEnv(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-const RPC_TIMEOUT_MS = parseIntEnv(process.env.LISTA_RPC_TIMEOUT_MS, 8000);
-const RPC_RETRY_COUNT = parseIntEnv(process.env.LISTA_RPC_RETRY_COUNT, 1);
-const RPC_RETRY_DELAY_MS = parseIntEnv(
-  process.env.LISTA_RPC_RETRY_DELAY_MS,
-  500
-);
-
 const CHAIN_ID_TO_VIEM_CHAIN: Record<string, Chain> = {
   "1": mainnet,
   "56": bsc,
 };
+
+const CHAIN_ID_TO_CAIP_CHAIN: Record<string, string> = {
+  "1": "eip155:1",
+  "56": "eip155:56",
+};
+
+interface SdkTransportOptions {
+  timeoutMs: number;
+  retryCount: number;
+  retryDelayMs: number;
+  rpcType: "public" | "custom";
+}
+
+function resolveSdkTransportOptions(chain: string): SdkTransportOptions {
+  const rpcConfig = getRpcConfig(chain);
+  return {
+    timeoutMs: parseIntEnv(process.env.LISTA_RPC_TIMEOUT_MS, rpcConfig.itemTimeout),
+    retryCount: parseIntEnv(process.env.LISTA_RPC_RETRY_COUNT, rpcConfig.retryCount),
+    retryDelayMs: parseIntEnv(process.env.LISTA_RPC_RETRY_DELAY_MS, rpcConfig.retryDelay),
+    rpcType: rpcConfig.type,
+  };
+}
 
 /**
  * Build RPC URLs config for SDK
@@ -52,28 +73,61 @@ function buildRpcConfig(): Record<string, string> {
 function primePublicClients(
   sdk: MoolahSDK,
   rpcUrls: Record<string, string>
-): string[] {
+): Array<{
+  chainId: string;
+  chain: string;
+  rpcType: "public" | "custom";
+  rpcCandidates: string[];
+  timeoutMs: number;
+  retryCount: number;
+  retryDelayMs: number;
+}> {
   const internalSdk = sdk as unknown as {
     publicClients?: Map<string, unknown>;
   };
   const clients = new Map<string, unknown>();
-  const configured: string[] = [];
+  const configured: Array<{
+    chainId: string;
+    chain: string;
+    rpcType: "public" | "custom";
+    rpcCandidates: string[];
+    timeoutMs: number;
+    retryCount: number;
+    retryDelayMs: number;
+  }> = [];
 
-  for (const [chainId, rpcUrl] of Object.entries(rpcUrls)) {
+  for (const [chainId, primaryRpcUrl] of Object.entries(rpcUrls)) {
     const chain = CHAIN_ID_TO_VIEM_CHAIN[chainId];
     if (!chain) continue;
+    const caipChain = CHAIN_ID_TO_CAIP_CHAIN[chainId];
+    if (!caipChain) continue;
+    const transportOptions = resolveSdkTransportOptions(caipChain);
+    const rpcCandidates = getRpcUrls(caipChain);
+    const candidateUrls =
+      rpcCandidates.length > 0 ? rpcCandidates : [primaryRpcUrl];
+    const transports = candidateUrls.map((url) =>
+      http(url, {
+        timeout: transportOptions.timeoutMs,
+        retryCount: transportOptions.retryCount,
+        retryDelay: transportOptions.retryDelayMs,
+      })
+    );
 
     const client = createPublicClient({
       chain,
-      transport: http(rpcUrl, {
-        timeout: RPC_TIMEOUT_MS,
-        retryCount: RPC_RETRY_COUNT,
-        retryDelay: RPC_RETRY_DELAY_MS,
-      }),
+      transport: transports.length === 1 ? transports[0] : fallback(transports),
     });
 
     clients.set(chainId, client);
-    configured.push(chainId);
+    configured.push({
+      chainId,
+      chain: caipChain,
+      rpcType: transportOptions.rpcType,
+      rpcCandidates: candidateUrls,
+      timeoutMs: transportOptions.timeoutMs,
+      retryCount: transportOptions.retryCount,
+      retryDelayMs: transportOptions.retryDelayMs,
+    });
   }
 
   if (internalSdk.publicClients instanceof Map) {
@@ -107,9 +161,6 @@ export function getSDK(): MoolahSDK {
         action: "sdk_initialized",
         chains: Object.keys(currentRpcUrls),
         rpc: {
-          timeoutMs: RPC_TIMEOUT_MS,
-          retryCount: RPC_RETRY_COUNT,
-          retryDelayMs: RPC_RETRY_DELAY_MS,
           primedChains,
         },
       })

@@ -86,7 +86,7 @@ SKILL.md uses progressive disclosure: it's a compact orchestrator that dispatche
 
 ## About Lista Lending
 
-Lista Lending (powered by the Moolah protocol) is a permissionless lending protocol on BNB Smart Chain. It features:
+Lista Lending (powered by the Moolah protocol) is a permissionless lending protocol across BNB Smart Chain and Ethereum. It features:
 
 - **Isolated markets** — each market has its own collateral, oracle, and risk params
 - **Curated vaults** — ERC4626 vaults that aggregate capital across markets

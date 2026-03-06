@@ -3,453 +3,508 @@ name: lista-lending
 version: 0.1.0
 repository: https://github.com/lista-dao/lista-skills
 requires:
-  wallet-connect: ">=1.0.0"
-description: Deposit and withdraw from Lista Lending vaults on BSC and Ethereum. Requires connected wallet via /wallet-connect.
+  lista-wallet-connect: ">=1.0.0"
+description: View and operate Lista Lending vaults/markets. Use when user asks about LENDING-ONLY positions or wants to deposit/withdraw/borrow/repay. For all-product overview, use lista-report instead.
 ---
 
 # Lista Lending Skill (POC)
 
 > **Version:** 0.1.0
 > **Status:** Pre-release (not public, skip registry verification)
-> **Requires:** wallet-connect >= 1.0.0
+> **Requires:** lista-wallet-connect >= 1.0.0
 > **Verify:** `npx tsx src/cli.ts version`
 > **If outdated:** `npm install && npm run build`
 
-Execute vault deposit/withdraw operations on Lista Lending protocol via WalletConnect.
+Execute Lista Lending vault and market operations through `@lista-dao/moolah-lending-sdk`, with transaction sending delegated to `lista-wallet-connect`.
+
+## When to Use This Skill
+
+**This skill handles LENDING-SPECIFIC viewing and operations.**
+
+**✅ Use when user wants to:**
+
+**1. View LENDING positions only:**
+
+- "Check my lending positions"
+- "Show my Lista vaults"
+- "What's in my lending markets"
+- "My collateral in lending vaults"
+
+**2. Execute lending operations:**
+
+- "Deposit 100 USDT to Lista vault"
+- "Withdraw from my Lista vault"
+- "Borrow against my collateral"
+- "Repay my lending debt"
+- "Find best lending yield"
+
+**❌ Do NOT use for:**
+
+- **All-product overview** → Use `lista-report` (RWA + credit + lending together)
+- **"Check ALL my Lista positions"** → Use `lista-report`
+- **"My total Lista collateral/debt"** (all products) → Use `lista-report`
+
+**Key difference:**
+
+- `lista-report`: VIEW **all** Lista products (RWA + credit + lending)
+- `lista-lending`: VIEW/OPERATE **lending only** (vaults + markets)
+- `lista-wallet-connect`: Wallet operations (connect/sign/transfer)
+
+## Scope
+
+Supported capabilities:
+
+- Vault: `vaults`, `select --vault`, `deposit`, `withdraw`
+- Market: `markets`, `select --market`, `supply`, `borrow`, `repay`, `market-withdraw`
+- Portfolio: `holdings`
+- Runtime/config: `config`, `version`
+
+Not in scope:
+
+- CDP operations
+- Non-EVM chains
+
+## Temporary Limitations
+
+Current unsupported market types for trade actions (`select/supply/borrow/repay/market-withdraw`):
+
+- SmartLending markets (`zone === 3`)
+- Fixed-term markets (`termType === 1`)
+
+Behavior:
+
+- `markets` command filters them out from list output.
+- `select --market` rejects them with `unsupported_market_type`.
+- `holdings` still returns them (for full portfolio visibility) and marks:
+  - `isSmartLending`
+  - `isFixedTerm`
+  - `isActionable`
 
 ## Project Structure
 
-```
+```text
 skills/lista-lending/
-├── SKILL.md              # This file
+├── SKILL.md
 ├── package.json
 ├── tsconfig.json
 └── src/
-    ├── cli.ts            # CLI entry point
-    ├── types.ts          # TypeScript interfaces
-    ├── api.ts            # Lista API client (vault discovery)
-    ├── config.ts         # RPC configuration storage
-    ├── context.ts        # Selected vault persistence
-    ├── sdk.ts            # SDK initialization
-    ├── executor.ts       # Transaction execution via wallet-connect
+    ├── cli.ts
+    ├── api.ts
+    ├── sdk.ts
+    ├── config.ts
+    ├── context.ts
+    ├── executor.ts
+    ├── presenters/
+    ├── utils/
     └── commands/
-        ├── config.ts     # RPC configuration management
-        ├── vaults.ts     # List available vaults
-        ├── holdings.ts   # Query user's vault positions
-        ├── select.ts     # Select vault for operations
-        ├── deposit.ts    # Vault deposit
-        └── withdraw.ts   # Vault withdraw
+        ├── vaults.ts
+        ├── markets.ts
+        ├── holdings.ts
+        ├── select.ts
+        ├── deposit.ts
+        ├── withdraw.ts
+        ├── supply.ts
+        ├── borrow.ts
+        ├── repay.ts
+        ├── market-withdraw.ts
+        └── config.ts
 ```
 
 ## Prerequisites
 
-1. **Wallet connected** via `/wallet-connect` skill
-2. **Chain enabled** in wallet session (BSC or Ethereum)
-3. **wallet-connect skill built** — this skill calls it internally
+1. Wallet is paired via `lista-wallet-connect` skill.
+2. You have a valid `wallet-topic` and `wallet-address`.
+3. `lista-wallet-connect` is built (`skills/lista-wallet-connect/dist/cli.js` exists).
 
-## First-Time Setup
+## Setup
 
 ```bash
-# Check if dependencies installed
-ls skills/lista-lending/node_modules/@lista-dao 2>/dev/null || echo "NEEDS_INSTALL"
-
-# Install dependencies
+# install dependencies
 cd skills/lista-lending && npm install
+
+# build
+npm run build
 ```
 
-## Running Commands
-
-Use `npx tsx` to run (ESM module resolution):
+Run commands from this folder:
 
 ```bash
-cd skills/lista-lending && npx tsx src/cli.ts <command> [options]
+cd skills/lista-lending
+npx tsx src/cli.ts <command> [options]
 ```
+
+## Output Contract
+
+- `stdout`: machine-readable JSON (result payload)
+- `stderr`: debug/diagnostic logs (`--debug` or persistent debug config)
+
+## Agent Display Guidelines
+
+For user-facing answers, keep CLI JSON as source of truth, then render with Markdown tables.
+
+`vaults` recommended columns:
+
+- `Vault`, `Asset`, `TVL (USD)`, `APY`, `Curator`
+
+`markets` recommended columns:
+
+- `Collateral`, `Loan`, `LLTV`, `Borrow Rate`, `Liquidity (USD)`
+
+`holdings` recommended structure:
+
+- Summary block first: total vault count, total market count, actionable market count, unsupported market count.
+- Vault table columns:
+  - `Vault`, `Chain`, `Deposited`, `Deposited USD`, `APY`, `Wallet Balance`
+- Actionable market table columns:
+  - `Market`, `Chain`, `Collateral USD`, `Borrowed USD`, `LTV`, `Health`
+- Unsupported market table columns (non-technical by default):
+  - `Market`, `Chain`, `Reason`, `Collateral USD`, `Borrowed USD`
+
+Default rule:
+
+- Use different table layouts for different commands (`vaults`, `markets`, `holdings`); do not reuse holdings layout for vault/market list pages.
+- Do **not** show `zone/termType` in user-facing table unless user explicitly asks for technical details.
+- Derive `Reason` from flags:
+  - `isSmartLending => SmartLending`
+  - `isFixedTerm => Fixed-term`
+
+Health definition (for market positions):
+
+- Formula: `health = LLTV / LTV` when `LTV > 0`; otherwise `health = 100`.
+- Display label suggestion:
+  - `Healthy`: `health >= 1.2`
+  - `Warning`: `1.0 <= health < 1.2`
+  - `Risk`: `health < 1.0`
+- Action hint: if label is `Warning` or `Risk`, suggest repay/reduce borrow.
 
 ## Supported Chains
 
-| Chain | CAIP-2 ID | Explorer |
-|-------|-----------|----------|
-| BSC (default) | `eip155:56` | bscscan.com |
-| Ethereum | `eip155:1` | etherscan.io |
+- `eip155:56` (BSC, default)
+- `eip155:1` (Ethereum)
 
-## Commands
+## Command Index
 
-### Vaults — List Available Vaults
+- `version` - show skill version and compatibility hints
+- `config` - read/update RPC and debug settings
+- `vaults` - list vaults with filters
+- `markets` - list markets with filters (SmartLending/fixed-term filtered)
+- `holdings` - query user positions across vault + market
+- `select` - set active vault or market context
+- `deposit` - deposit to selected/explicit vault
+- `withdraw` - withdraw from selected/explicit vault
+- `supply` - supply collateral to selected/explicit market
+- `borrow` - simulate or execute borrow
+- `repay` - repay debt in selected/explicit market
+- `market-withdraw` - withdraw supplied collateral from selected/explicit market
+
+## Global/Shared Options
+
+- `--chain <eip155:56|eip155:1>`
+- `--wallet-topic <topic>`
+- `--wallet-address <0x...>`
+- `--debug` (one-time debug for current command)
+
+## Command Details
+
+### 1) `version`
+
+Purpose: Print skill version and dependency constraints.
 
 ```bash
-# List BSC vaults (default)
+npx tsx src/cli.ts version
+```
+
+### 2) `config`
+
+Purpose: Manage RPC override and debug mode.
+
+Examples:
+
+```bash
+# show config
+npx tsx src/cli.ts config --show
+
+# set rpc override
+npx tsx src/cli.ts config --set-rpc --chain eip155:56 --url https://bsc-mainnet.nodereal.io/v1/<key>
+
+# clear rpc override
+npx tsx src/cli.ts config --clear-rpc --chain eip155:56
+
+# persistent debug toggle
+npx tsx src/cli.ts config --set-debug
+npx tsx src/cli.ts config --clear-debug
+```
+
+Notes:
+
+- Config file: `~/.agent-wallet/lending-config.json`
+- Chain fallback RPCs are still used if primary RPC fails.
+
+### 3) `vaults`
+
+Purpose: Discover vaults from SDK list API.
+
+Common options:
+
+- `--page`, `--page-size`, `--sort`, `--order`
+- `--zone`, `--keyword`
+- `--assets <a,b>`, `--curators <a,b>`
+
+Examples:
+
+```bash
 npx tsx src/cli.ts vaults
-
-# List Ethereum vaults
 npx tsx src/cli.ts vaults --chain eip155:1
-
-# Filter + sort (SDK-backed)
-npx tsx src/cli.ts vaults \
-  --chain eip155:56 \
-  --sort apy \
-  --order desc \
-  --page 1 \
-  --page-size 20
-
-# Optional filters (pass comma-separated values)
-npx tsx src/cli.ts vaults \
-  --chain eip155:56 \
-  --assets 0x8d0d000ee44948fc98c9b98a4fa4921476f08b0d,0x55d398326f99059ff775485246999027b3197955 \
-  --curators "Lista DAO,Pangolins"
+npx tsx src/cli.ts vaults --sort apy --order desc --page 1 --page-size 10
+npx tsx src/cli.ts vaults --assets 0x8d0d...,0x55d3... --curators "Lista DAO,Pangolins"
 ```
 
-**Vaults filter options:**
-- `--page <number>` / `--page-size <number>` — Pagination
-- `--sort <field>` / `--order <asc|desc>` — Sorting
-- `--zone <value>` / `--keyword <text>` — Generic API filters
-- `--assets <a,b>` — Asset filter (recommended: token addresses)
-- `--curators <a,b>` — Curator filter
+### 4) `markets`
 
-**Output:**
-```json
-{
-  "status": "success",
-  "chain": "eip155:56",
-  "count": 18,
-  "vaults": [
-    {
-      "index": 0,
-      "address": "0x57134a64b7cd9f9eb72f8255a671f5bf2fe3e2d0",
-      "name": "Lista BNB Vault",
-      "asset": "BNB",
-      "assetAddress": "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c",
-      "decimals": 4,
-      "tvl": "316142211.669920502510345539",
-      "apy": "0.008441518428235628",
-      "curator": "Lista DAO",
-      "display": "[0] Lista BNB Vault (BNB) - TVL: $316,142,212, APY: 0.84%"
-    }
-  ]
-}
-```
+Purpose: Discover markets from SDK list API.
 
-### Holdings — Query User's Vault Positions
+Common options:
+
+- `--page`, `--page-size`, `--sort`, `--order`
+- `--zone`, `--keyword`
+- `--loans <a,b>`, `--collaterals <a,b>`
+
+Examples:
 
 ```bash
-# Get vaults user has positions in
-npx tsx src/cli.ts holdings --address 0xUSER_ADDRESS
+npx tsx src/cli.ts markets
+npx tsx src/cli.ts markets --chain eip155:56 --sort liquidity --order desc --page-size 20
+npx tsx src/cli.ts markets --loans USD1,USDT --collaterals USD1,BTCB
 ```
 
-**Note:** API returns vault addresses only. Use `select --vault <address>` to query actual on-chain balances.
+Notes:
 
-**Output:**
-```json
-{
-  "status": "success",
-  "address": "0x...",
-  "count": 3,
-  "holdings": [
-    {
-      "index": 0,
-      "vaultAddress": "0xfa27f172e0b6ebcef9c51abf817e2cb142fbe627",
-      "vaultName": "Lista USD1 Vault",
-      "curator": "Lista DAO",
-      "apy": "0.018067307501024944",
-      "chain": "eip155:56",
-      "display": "[0] Lista USD1 Vault (Lista DAO) - APY: 1.81%"
-    }
-  ],
-  "note": "Use 'select --vault <address>' then check position for actual balances"
-}
-```
+- Command filters out SmartLending (`zone=3`) and fixed-term (`termType=1`) markets in output.
+- Always include this user-facing note when presenting market list:
+  - `Smart Lending and fixed-term market operations are currently not supported in this skill. For full functionality, please use the Lista website.`
 
-### Select — Select Vault for Operations
+### 5) `holdings`
 
-Select a vault and query on-chain position. Persisted in `~/.agent-wallet/lending-context.json`.
+Purpose: Query positions by wallet address.
+
+Options:
+
+- `--address <0x...>` (optional if context already has `userAddress`)
+- `--scope <all|vault|market|selected>`
+
+Examples:
 
 ```bash
-# Select vault and connect wallet
+# all positions (vault + market)
+npx tsx src/cli.ts holdings --address 0xYOUR_ADDRESS
+
+# only vault positions
+npx tsx src/cli.ts holdings --address 0xYOUR_ADDRESS --scope vault
+
+# only market positions
+npx tsx src/cli.ts holdings --address 0xYOUR_ADDRESS --scope market
+
+# only currently selected position
+npx tsx src/cli.ts holdings --scope selected
+```
+
+Market position fields include:
+
+- User-facing fields:
+  - `isSmartLending` (`zone === 3`)
+  - `isFixedTerm` (`termType === 1`)
+  - `isActionable` (`!isSmartLending && !isFixedTerm`)
+- Raw JSON technical fields (debug/integration only):
+  - `zone`, `termType`
+
+### 6) `select`
+
+Purpose: Persist active target in context for follow-up operations.
+
+Modes:
+
+- select vault: `--vault`
+- select market: `--market`
+- read context: `--show`
+- clear context: `--clear`
+
+Examples:
+
+```bash
+# select vault
 npx tsx src/cli.ts select \
-  --vault 0xVAULT_ADDRESS \
+  --vault 0xfa27f172e0b6ebcef9c51abf817e2cb142fbe627 \
+  --chain eip155:56 \
   --wallet-topic <topic> \
   --wallet-address 0xYOUR_ADDRESS
 
-# Select on specific chain
+# select market
 npx tsx src/cli.ts select \
-  --vault 0xVAULT_ADDRESS \
-  --chain eip155:1 \
+  --market 0xd384584abf6504425c9873f34a63372625d46cd1f2e79aeedc77475cacaca922 \
+  --chain eip155:56 \
   --wallet-topic <topic> \
   --wallet-address 0xYOUR_ADDRESS
 
-# Show current selection
+# show/clear
 npx tsx src/cli.ts select --show
-
-# Clear selection
 npx tsx src/cli.ts select --clear
 ```
 
-**Output:**
-```json
-{
-  "status": "success",
-  "action": "selected",
-  "vault": {
-    "address": "0x...",
-    "name": "USD1 Vault",
-    "asset": {
-      "symbol": "USD1",
-      "address": "0x...",
-      "decimals": 18
-    },
-    "chain": "eip155:56"
-  },
-  "userAddress": "0x...",
-  "balance": "120.00000000",
-  "vaultBalance": "100.50000000",
-  "position": {
-    "assets": "100.50000000",
-    "balance": "100.50000000",
-    "walletBalance": "120.00000000",
-    "assetSymbol": "USD1",
-    "hasPosition": true
-  },
-  "message": "Selected USD1 Vault. You have 100.50000000 USD1 deposited. Wallet balance: 120.00000000 USD1."
-}
-```
+Notes:
 
-### Config — Manage RPC URLs
+- Market selection rejects SmartLending and fixed-term markets.
+- Context file: `~/.agent-wallet/lending-context.json`
+
+### 7) `deposit`
+
+Purpose: Deposit vault asset.
+
+Required:
+
+- `--amount`
+- plus either selected vault context or explicit `--vault` + wallet info
+
+Example:
 
 ```bash
-# Show current configuration
-npx tsx src/cli.ts config --show
+# using selected vault
+npx tsx src/cli.ts deposit --amount 1
 
-# Set custom RPC for BSC
-npx tsx src/cli.ts config --set-rpc --chain eip155:56 --url https://my-bsc-rpc.com
-
-# Set custom RPC for Ethereum
-npx tsx src/cli.ts config --set-rpc --chain eip155:1 --url https://my-eth-rpc.com
-
-# Clear custom RPC (revert to default)
-npx tsx src/cli.ts config --clear-rpc --chain eip155:56
-
-# Enable persistent debug logs
-npx tsx src/cli.ts config --set-debug
-
-# Disable persistent debug logs
-npx tsx src/cli.ts config --clear-debug
-
-# One-time debug for current command only
-npx tsx src/cli.ts borrow --simulate --debug
-```
-
-**Default Public RPCs:**
-- BSC: `https://bsc-dataseed.binance.org`
-- ETH: `https://eth.llamarpc.com`
-
-**Config file:** `~/.agent-wallet/lending-config.json`
-
-### Deposit to Vault
-
-```bash
-# Using selected vault (after 'select' command)
-npx tsx src/cli.ts deposit --amount 100
-
-# Explicit vault address
+# explicit target
 npx tsx src/cli.ts deposit \
-  --vault 0xVAULT_ADDRESS \
-  --amount 100 \
-  --wallet-topic <topic> \
-  --wallet-address 0xYOUR_ADDRESS
-
-# Deposit on Ethereum
-npx tsx src/cli.ts deposit \
-  --vault 0xVAULT_ADDRESS \
-  --amount 100 \
-  --chain eip155:1 \
+  --vault 0xVAULT \
+  --amount 1 \
+  --chain eip155:56 \
   --wallet-topic <topic> \
   --wallet-address 0xYOUR_ADDRESS
 ```
 
-**Parameters:**
-- `--vault` — Vault address (uses selected vault if omitted)
-- `--amount` — Amount in token units, e.g., "100" for 100 USDT (required)
-- `--chain` — Chain ID (uses selected vault's chain if omitted)
-- `--wallet-topic` — WalletConnect session topic (uses saved topic if omitted)
-- `--wallet-address` — Your wallet address (uses saved address if omitted)
+### 8) `withdraw`
 
-**Flow:**
-1. Fetch vault info (asset, decimals)
-2. Build deposit steps via SDK (may include approve)
-3. Execute each step via wallet-connect `call`
-4. Return tx hash or error
+Purpose: Withdraw vault asset.
 
-**Output:**
-```json
-{
-  "status": "success",
-  "vault": "0x...",
-  "chain": "eip155:56",
-  "asset": "USDT",
-  "deposited": "100",
-  "steps": 2,
-  "txHash": "0x...",
-  "explorer": "https://bscscan.com/tx/0x...",
-  "balance": "20.00000000",
-  "vaultBalance": "100.50000000",
-  "position": {
-    "balance": "100.50000000",
-    "assets": "100.50000000",
-    "walletBalance": "20.00000000",
-    "assetSymbol": "USDT"
-  }
-}
-```
+Required:
 
-### Withdraw from Vault
+- one of `--amount` or `--withdraw-all`
+
+Examples:
 
 ```bash
-# Using selected vault (after 'select' command)
-npx tsx src/cli.ts withdraw --amount 50
-
-# Withdraw all from selected vault
+npx tsx src/cli.ts withdraw --amount 0.5
 npx tsx src/cli.ts withdraw --withdraw-all
-
-# Explicit vault address
-npx tsx src/cli.ts withdraw \
-  --vault 0xVAULT_ADDRESS \
-  --amount 50 \
-  --wallet-topic <topic> \
-  --wallet-address 0xYOUR_ADDRESS
 ```
 
-**Parameters:**
-- `--vault` — Vault address (uses selected vault if omitted)
-- `--amount` — Amount in token units (one of amount/withdraw-all required)
-- `--withdraw-all` — Withdraw entire position
-- `--chain` — Chain ID (uses selected vault's chain if omitted)
-- `--wallet-topic` — WalletConnect session topic (uses saved topic if omitted)
-- `--wallet-address` — Your wallet address (uses saved address if omitted)
+### 9) `supply`
 
-**Output:**
-```json
-{
-  "status": "success",
-  "vault": "0x...",
-  "chain": "eip155:56",
-  "asset": "USDT",
-  "withdrawn": "50",
-  "txHash": "0x...",
-  "explorer": "https://bscscan.com/tx/0x...",
-  "balance": "115.39490000",
-  "vaultBalance": "50.50000000",
-  "position": {
-    "balance": "50.50000000",
-    "assets": "50.50000000",
-    "walletBalance": "115.39490000",
-    "assetSymbol": "USDT",
-    "remaining": true
-  }
-}
-```
+Purpose: Supply market collateral.
 
-## Error Handling
+Required:
 
-| Error Type | Response |
-|------------|----------|
-| User rejected | `{ status: "rejected", reason: "user_rejected", failedStep: "approve" }` |
-| Contract revert | `{ status: "reverted", reason: "...", failedStep: "depositVault" }` |
-| Insufficient balance | `{ status: "error", reason: "insufficient_balance" }` |
-| No position | `{ status: "error", reason: "no_position" }` |
-| Invalid vault | `{ status: "error", reason: "invalid_vault" }` |
-| RPC error | `{ status: "error", reason: "rpc_error", hint: "..." }` |
+- `--amount`
+- plus selected market context or explicit market/wallet parameters
 
-**Partial execution tracking:**
-
-If approve succeeds but deposit fails:
-```json
-{
-  "status": "reverted",
-  "reason": "Contract execution reverted",
-  "failedStep": "depositVault",
-  "completedSteps": 1,
-  "totalSteps": 2,
-  "completedTxs": [{ "step": "approve", "txHash": "0x..." }]
-}
-```
-
-## Integration with wallet-connect
-
-This skill generates transaction calldata using `@lista-dao/moolah-lending-sdk`, then executes via wallet-connect's `call` command:
+Example:
 
 ```bash
-# Generated internally for each step:
-node skills/wallet-connect/dist/cli.js call \
-  --topic <wallet-topic> \
-  --chain <chain> \
-  --to <contract> \
-  --data <calldata> \
-  --value <if-native>
+npx tsx src/cli.ts supply --amount 2
 ```
 
-## SDK Reference
+### 10) `borrow`
 
-Uses:
-- `@lista-dao/moolah-sdk-core` — Core utilities, RPC calls
-- `@lista-dao/moolah-lending-sdk` — Transaction builders returning `StepParam[]`
+Purpose: Borrow loan token, or simulate borrow capacity.
 
-**SDK methods used:**
-- `getVaultInfo(chainId, vaultAddress)` — Get vault metadata
-- `getVaultUserData(chainId, vaultAddress, userAddress)` — Get user's position
-- `buildVaultDepositParams(params)` — Build deposit transaction(s)
-- `buildVaultWithdrawParams(params)` — Build withdraw transaction(s)
+Modes:
 
-## Typical Workflow
+- simulate only: `--simulate`
+- simulate with hypothetical supply: `--simulate --simulate-supply <amt>`
+- execute borrow: `--amount <amt>`
+
+Examples:
 
 ```bash
-# 1. Connect wallet (via wallet-connect skill)
-node skills/wallet-connect/dist/cli.js pair --chains eip155:56
+# check max borrowable
+npx tsx src/cli.ts borrow --simulate
 
-# 2. Discover vaults
-npx tsx src/cli.ts vaults
+# check max after hypothetical supply
+npx tsx src/cli.ts borrow --simulate --simulate-supply 2
 
-# 3. Check user's existing positions
-npx tsx src/cli.ts holdings --address 0xYOUR_ADDRESS
-
-# 4. Select vault for operations
-npx tsx src/cli.ts select \
-  --vault 0xVAULT_ADDRESS \
-  --wallet-topic <topic> \
-  --wallet-address 0xYOUR_ADDRESS
-
-# 5. Deposit into selected vault
-npx tsx src/cli.ts deposit --amount 100
-
-# 6. Check updated position
-npx tsx src/cli.ts select --show
-
-# 7. Withdraw
-npx tsx src/cli.ts withdraw --amount 50
+# execute borrow
+npx tsx src/cli.ts borrow --amount 0.01
 ```
 
-## Security
+### 11) `repay`
 
-1. **Always confirm** deposit/withdraw amounts with user before execution
-2. **Show token symbol and amount** clearly
-3. **Warn on large transactions** (>$500 equivalent)
-4. **Check for contract reverts** — may indicate slippage or other issues
+Purpose: Repay market debt.
 
-## Data Flow
+Required:
 
+- one of `--amount` or `--repay-all`
+
+Examples:
+
+```bash
+npx tsx src/cli.ts repay --amount 0.01
+npx tsx src/cli.ts repay --repay-all
 ```
-┌─────────────────┐     ┌───────────────┐     ┌─────────────────┐
-│   Lista API     │────>│  holdings/    │────>│   Vault         │
-│   (discovery)   │     │  vaults cmd   │     │   Addresses     │
-└─────────────────┘     └───────────────┘     └─────────────────┘
-                                                      │
-                                                      v
-┌─────────────────┐     ┌───────────────┐     ┌─────────────────┐
-│   Moolah SDK    │<────│   select/     │<────│   On-chain      │
-│   (tx build)    │     │   deposit/    │     │   Position      │
-└─────────────────┘     │   withdraw    │     └─────────────────┘
-        │               └───────────────┘
-        v
-┌─────────────────┐     ┌───────────────┐
-│  WalletConnect  │<────│   executor    │
-│   (send tx)     │     │   (call cmd)  │
-└─────────────────┘     └───────────────┘
+
+### 12) `market-withdraw`
+
+Purpose: Withdraw market collateral.
+
+Required:
+
+- one of `--amount` or `--withdraw-all`
+
+Examples:
+
+```bash
+npx tsx src/cli.ts market-withdraw --amount 0.5
+npx tsx src/cli.ts market-withdraw --withdraw-all
 ```
+
+## Transaction Behavior
+
+- Transactions are built by SDK and executed through `lista-wallet-connect` `call` command.
+- `call` performs simulation by default before requesting wallet signature.
+- If simulation fails, result is returned as error/reverted and no signing request is sent.
+- If user rejects in wallet, command returns `status: "rejected", reason: "user_rejected"`.
+
+## Typical Workflows
+
+### Vault flow
+
+```bash
+# 1) discover
+npx tsx src/cli.ts vaults --chain eip155:56
+
+# 2) select
+npx tsx src/cli.ts select --vault 0xVAULT --wallet-topic <topic> --wallet-address 0xADDR
+
+# 3) operate
+npx tsx src/cli.ts deposit --amount 1
+npx tsx src/cli.ts withdraw --amount 0.5
+```
+
+### Market flow
+
+```bash
+# 1) discover
+npx tsx src/cli.ts markets --chain eip155:56
+
+# 2) select
+npx tsx src/cli.ts select --market 0xMARKET --wallet-topic <topic> --wallet-address 0xADDR
+
+# 3) operate
+npx tsx src/cli.ts supply --amount 2
+npx tsx src/cli.ts borrow --simulate
+npx tsx src/cli.ts borrow --amount 0.01
+npx tsx src/cli.ts repay --amount 0.01
+npx tsx src/cli.ts market-withdraw --amount 1
+```
+
+## Security Checklist
+
+1. Confirm token symbol and amount with user before any state-changing action.
+2. Confirm chain (`eip155:56` vs `eip155:1`) before sending tx.
+3. Prefer `borrow --simulate` before first borrow on a market.
+4. Treat `user_rejected` as normal user decision, not protocol failure.

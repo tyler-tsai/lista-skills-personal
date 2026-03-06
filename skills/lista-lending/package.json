@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Lista Lending vault operations via WalletConnect",
   "skillRequires": {
-    "wallet-connect": ">=1.0.0"
+    "lista-wallet-connect": ">=1.0.0"
   },
   "type": "module",
   "main": "dist/cli.js",

@@ -17,9 +17,11 @@ import {
 const ZONE_SMART_LENDING = 3;
 // TermType constants
 const TERM_TYPE_FIXED = 1;
+const MARKET_OPERATION_LIMITATION_NOTE =
+  "Smart Lending and fixed-term market operations are currently not supported in this skill. For full functionality, please use the Lista website.";
 
 function formatUsd(value: string): string {
-  const num = parseFloat(value);
+  const num = Number.parseFloat(value);
   if (!Number.isFinite(num)) return "0";
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`;
   if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K`;
@@ -138,6 +140,7 @@ export async function cmdMarkets(args: MarketsArgs): Promise<void> {
           chain,
           markets: [],
           message: "No markets found",
+          note: MARKET_OPERATION_LIMITATION_NOTE,
         })
       );
       return;
@@ -159,6 +162,7 @@ export async function cmdMarkets(args: MarketsArgs): Promise<void> {
           loans: args.loans,
           collaterals: args.collaterals,
         },
+        note: MARKET_OPERATION_LIMITATION_NOTE,
         markets: filteredMarkets.map((m, i) => ({
           index: i,
           marketId: m.id,
@@ -172,7 +176,7 @@ export async function cmdMarkets(args: MarketsArgs): Promise<void> {
           liquidity: m.liquidity,
           liquidityUsd: m.liquidityUsd,
           vaults: m.vaults?.map((v: { name: string }) => v.name).join(", "),
-          display: `[${i}] ${m.collateral}/${m.loan} - LLTV: ${(parseFloat(m.lltv) * 100).toFixed(1)}%, Liquidity: $${formatUsd(m.liquidityUsd)}`,
+          display: `[${i}] ${m.collateral}/${m.loan} - LLTV: ${(Number.parseFloat(m.lltv) * 100).toFixed(1)}%, Liquidity: $${formatUsd(m.liquidityUsd)}`,
         })),
       })
     );

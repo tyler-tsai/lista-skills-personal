@@ -1,5 +1,5 @@
 /**
- * Shared interfaces for wallet-connect-skill.
+ * Shared interfaces for lista-wallet-connect-skill.
  */
 
 export interface Session {

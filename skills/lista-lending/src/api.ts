@@ -5,7 +5,7 @@
 import { Decimal } from "@lista-dao/moolah-lending-sdk";
 import type { Address } from "viem";
 import { getSDK } from "./sdk.js";
-import { getChainId } from "./config.js";
+import { getChainId, getRpcConfig } from "./config.js";
 import type { MarketUserData, VaultInfo, VaultUserData } from "./types.js";
 import { normalizeHoldingChain } from "./utils/validators.js";
 import { mapMarketUserPosition, mapVaultUserPosition } from "./utils/position.js";
@@ -26,22 +26,54 @@ function parseIntEnv(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-const VAULT_ONCHAIN_CONCURRENCY = parseIntEnv(
-  process.env.LISTA_VAULT_ONCHAIN_CONCURRENCY,
-  3
-);
-const MARKET_ONCHAIN_CONCURRENCY = parseIntEnv(
-  process.env.LISTA_MARKET_ONCHAIN_CONCURRENCY,
-  2
-);
-const ONCHAIN_ITEM_TIMEOUT_MS = parseIntEnv(
-  process.env.LISTA_ONCHAIN_ITEM_TIMEOUT_MS,
-  7000
-);
-const ONCHAIN_TOTAL_BUDGET_MS = parseIntEnv(
-  process.env.LISTA_ONCHAIN_TOTAL_BUDGET_MS,
-  35000
-);
+/**
+ * Get concurrency settings for vault onchain queries (with env override)
+ */
+function getVaultConcurrency(chain: string): number {
+  const { vaultConcurrency } = getRpcConfig(chain);
+  const envValue = process.env.LISTA_VAULT_ONCHAIN_CONCURRENCY;
+  if (envValue) return parseIntEnv(envValue, vaultConcurrency);
+  return vaultConcurrency;
+}
+
+/**
+ * Get concurrency settings for market onchain queries (with env override)
+ */
+function getMarketConcurrency(chain: string): number {
+  const { marketConcurrency } = getRpcConfig(chain);
+  const envValue = process.env.LISTA_MARKET_ONCHAIN_CONCURRENCY;
+  if (envValue) return parseIntEnv(envValue, marketConcurrency);
+  return marketConcurrency;
+}
+
+/**
+ * Get timeout for individual onchain items (with env override)
+ */
+function getItemTimeout(chain: string): number {
+  const { itemTimeout } = getRpcConfig(chain);
+  const envValue = process.env.LISTA_ONCHAIN_ITEM_TIMEOUT_MS;
+  if (envValue) return parseIntEnv(envValue, itemTimeout);
+  return itemTimeout;
+}
+
+/**
+ * Get total budget for one holdings query (with env override)
+ */
+function getTotalBudget(chain: string): number {
+  const { totalBudget } = getRpcConfig(chain);
+  const envValue = process.env.LISTA_ONCHAIN_TOTAL_BUDGET_MS;
+  if (envValue) return parseIntEnv(envValue, totalBudget);
+  return totalBudget;
+}
+
+async function withRpcGuard<T>(
+  operation: () => Promise<T>,
+  chain: string,
+  label: string
+): Promise<T> {
+  const itemTimeout = getItemTimeout(chain);
+  return withTimeout(operation(), itemTimeout, label);
+}
 
 function toApiChainFilter(
   chain: string | string[],
@@ -105,6 +137,51 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+async function mapByChainWithConcurrency<T, R>(
+  items: T[],
+  resolveChain: (item: T) => string,
+  resolveConcurrency: (chain: string) => number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) return [];
+
+  const buckets = new Map<string, Array<{ item: T; index: number }>>();
+  items.forEach((item, index) => {
+    const chain = resolveChain(item);
+    const bucket = buckets.get(chain);
+    if (bucket) {
+      bucket.push({ item, index });
+      return;
+    }
+    buckets.set(chain, [{ item, index }]);
+  });
+
+  const results = new Array<R | undefined>(items.length);
+  await Promise.all(
+    Array.from(buckets.entries()).map(async ([chain, bucketItems]) => {
+      const concurrency = resolveConcurrency(chain);
+      const mapped = await mapWithConcurrency(
+        bucketItems,
+        concurrency,
+        async ({ item, index }) => ({
+          index,
+          value: await mapper(item, index),
+        })
+      );
+      mapped.forEach(({ index, value }) => {
+        results[index] = value;
+      });
+    })
+  );
+
+  return results.map((item, index) => {
+    if (item === undefined) {
+      throw new Error(`internal_missing_result_${index}`);
+    }
+    return item;
+  });
+}
+
 function toAddress(value: string): Address {
   return value as Address;
 }
@@ -126,6 +203,70 @@ function safeNormalizeHoldingChain(chain: string): string {
   } catch {
     return chain;
   }
+}
+
+function mapVaultErrorPosition(
+  holding: ApiVaultHoldingItem,
+  chain: string,
+  error: string
+): ApiVaultPosition {
+  return {
+    kind: "vault",
+    vaultAddress: holding.address,
+    vaultName: holding.name,
+    curator: holding.curator,
+    apy: holding.apy,
+    emissionApy: holding.emissionApy,
+    chain,
+    assetSymbol: "UNKNOWN",
+    assetPrice: holding.assetPrice || "0",
+    walletBalance: "0",
+    deposited: "0",
+    depositedUsd: "0",
+    shares: "0",
+    hasPosition: false,
+    error,
+  };
+}
+
+function mapMarketErrorPosition(
+  holding: ApiMarketHoldingItem,
+  chain: string,
+  error: string
+): ApiMarketPosition {
+  const isSmartLending = holding.zone === 3;
+  const isFixedTerm = holding.termType === 1;
+  return {
+    kind: "market",
+    marketId: holding.marketId,
+    chain,
+    zone: holding.zone,
+    termType: holding.termType,
+    isSmartLending,
+    isFixedTerm,
+    isActionable: !isSmartLending && !isFixedTerm,
+    broker: holding.broker || undefined,
+    collateralSymbol: holding.collateralSymbol,
+    collateralAddress: holding.collateralToken,
+    collateralPrice: holding.collateralPrice,
+    loanSymbol: holding.loanSymbol,
+    loanAddress: holding.loanToken,
+    loanPrice: holding.loanPrice,
+    supplyApy: holding.supplyApy,
+    borrowRate: "0",
+    collateral: "0",
+    collateralUsd: "0",
+    borrowed: "0",
+    borrowedUsd: "0",
+    ltv: "0",
+    lltv: holding.zone === 3 ? "0.909" : "0",
+    health: "0",
+    liquidationPriceRate: "0",
+    walletCollateralBalance: "0",
+    walletLoanBalance: "0",
+    isWhitelisted: false,
+    error,
+  };
 }
 
 /**
@@ -215,45 +356,37 @@ export async function fetchVaultPositions(
   });
 
   const holdings: ApiVaultHoldingItem[] = data.objs || [];
-  const deadline = Date.now() + ONCHAIN_TOTAL_BUDGET_MS;
-  const positions = await mapWithConcurrency(
+  const chains = Array.from(
+    new Set(holdings.map((holding) => safeNormalizeHoldingChain(holding.chain)))
+  );
+  const chainDeadlines = new Map(
+    chains.map((chain) => [chain, Date.now() + getTotalBudget(chain)])
+  );
+  const fallbackDeadline = Date.now() + getTotalBudget("eip155:56");
+
+  const positions = await mapByChainWithConcurrency(
     holdings,
-    VAULT_ONCHAIN_CONCURRENCY,
+    (holding) => safeNormalizeHoldingChain(holding.chain),
+    getVaultConcurrency,
     async (h): Promise<ApiVaultPosition> => {
-      let chain = h.chain;
-      if (Date.now() > deadline) {
-        return {
-          kind: "vault",
-          vaultAddress: h.address,
-          vaultName: h.name,
-          curator: h.curator,
-          apy: h.apy,
-          emissionApy: h.emissionApy,
-          chain: safeNormalizeHoldingChain(h.chain),
-          assetSymbol: "UNKNOWN",
-          assetPrice: h.assetPrice || "0",
-          walletBalance: "0",
-          deposited: "0",
-          depositedUsd: "0",
-          shares: "0",
-          hasPosition: false,
-          error: "skipped_onchain_due_to_time_budget",
-        };
+      let chain = safeNormalizeHoldingChain(h.chain);
+      const chainDeadline = chainDeadlines.get(chain) ?? fallbackDeadline;
+      if (Date.now() > chainDeadline) {
+        return mapVaultErrorPosition(h, chain, "skipped_onchain_due_to_time_budget");
       }
       try {
         chain = normalizeHoldingChain(h.chain);
         const chainId = getChainId(chain);
         const vaultAddress = toAddress(h.address);
         const walletAddress = toAddress(userAddress);
-
-        const vaultInfo = await withTimeout<VaultInfo>(
-          sdk.getVaultInfo(chainId, vaultAddress),
-          ONCHAIN_ITEM_TIMEOUT_MS,
+        const vaultInfo = await withRpcGuard<VaultInfo>(
+          () => sdk.getVaultInfo(chainId, vaultAddress),
+          chain,
           "getVaultInfo"
         );
-        const userData = await withTimeout<VaultUserData>(
-          sdk.getVaultUserData(chainId, vaultAddress, walletAddress, vaultInfo),
-          ONCHAIN_ITEM_TIMEOUT_MS,
+        const userData = await withRpcGuard<VaultUserData>(
+          () => sdk.getVaultUserData(chainId, vaultAddress, walletAddress, vaultInfo),
+          chain,
           "getVaultUserData"
         );
         const mapped = mapVaultUserPosition(userData);
@@ -279,23 +412,7 @@ export async function fetchVaultPositions(
         };
       } catch (err) {
         const message = (err as Error).message || String(err);
-        return {
-          kind: "vault",
-          vaultAddress: h.address,
-          vaultName: h.name,
-          curator: h.curator,
-          apy: h.apy,
-          emissionApy: h.emissionApy,
-          chain,
-          assetSymbol: "UNKNOWN",
-          assetPrice: h.assetPrice || "0",
-          walletBalance: "0",
-          deposited: "0",
-          depositedUsd: "0",
-          shares: "0",
-          hasPosition: false,
-          error: message,
-        };
+        return mapVaultErrorPosition(h, chain, message);
       }
     }
   );
@@ -319,50 +436,36 @@ export async function fetchMarketPositions(
     type: "market",
   });
 
-  const deadline = Date.now() + ONCHAIN_TOTAL_BUDGET_MS;
-  const markets = await mapWithConcurrency(
-    data.objs || [],
-    MARKET_ONCHAIN_CONCURRENCY,
+  const holdings: ApiMarketHoldingItem[] = data.objs || [];
+  const chains = Array.from(
+    new Set(holdings.map((holding) => safeNormalizeHoldingChain(holding.chain)))
+  );
+  const chainDeadlines = new Map(
+    chains.map((chain) => [chain, Date.now() + getTotalBudget(chain)])
+  );
+  const fallbackDeadline = Date.now() + getTotalBudget("eip155:56");
+
+  const markets = await mapByChainWithConcurrency(
+    holdings,
+    (holding) => safeNormalizeHoldingChain(holding.chain),
+    getMarketConcurrency,
     async (h: ApiMarketHoldingItem): Promise<ApiMarketPosition> => {
-      let chain = h.chain;
-      if (Date.now() > deadline) {
-        return {
-          kind: "market",
-          marketId: h.marketId,
-          chain: safeNormalizeHoldingChain(h.chain),
-          zone: h.zone,
-          termType: h.termType,
-          broker: h.broker || undefined,
-          collateralSymbol: h.collateralSymbol,
-          collateralAddress: h.collateralToken,
-          collateralPrice: h.collateralPrice,
-          loanSymbol: h.loanSymbol,
-          loanAddress: h.loanToken,
-          loanPrice: h.loanPrice,
-          supplyApy: h.supplyApy,
-          borrowRate: "0",
-          collateral: "0",
-          collateralUsd: "0",
-          borrowed: "0",
-          borrowedUsd: "0",
-          ltv: "0",
-          lltv: h.zone === 3 ? "0.909" : "0",
-          health: "0",
-          liquidationPriceRate: "0",
-          walletCollateralBalance: "0",
-          walletLoanBalance: "0",
-          isWhitelisted: false,
-          error: "skipped_onchain_due_to_time_budget",
-        };
+      let chain = safeNormalizeHoldingChain(h.chain);
+      const isSmartLending = h.zone === 3;
+      const isFixedTerm = h.termType === 1;
+      const isActionable = !isSmartLending && !isFixedTerm;
+      const chainDeadline = chainDeadlines.get(chain) ?? fallbackDeadline;
+      if (Date.now() > chainDeadline) {
+        return mapMarketErrorPosition(h, chain, "skipped_onchain_due_to_time_budget");
       }
       try {
         chain = normalizeHoldingChain(h.chain);
         const chainId = getChainId(chain);
         const marketId = toAddress(h.marketId);
         const walletAddress = toAddress(userAddress);
-        const userData = await withTimeout<MarketUserData>(
-          sdk.getMarketUserData(chainId, marketId, walletAddress),
-          ONCHAIN_ITEM_TIMEOUT_MS,
+        const userData = await withRpcGuard<MarketUserData>(
+          () => sdk.getMarketUserData(chainId, marketId, walletAddress),
+          chain,
           "getMarketUserData"
         );
         const mapped = mapMarketUserPosition(userData, {
@@ -376,6 +479,9 @@ export async function fetchMarketPositions(
           chain,
           zone: h.zone,
           termType: h.termType,
+          isSmartLending,
+          isFixedTerm,
+          isActionable,
           broker: h.broker || undefined,
           collateralSymbol: h.collateralSymbol,
           collateralAddress: h.collateralToken,
@@ -399,34 +505,7 @@ export async function fetchMarketPositions(
         };
       } catch (err) {
         const message = (err as Error).message || String(err);
-        return {
-          kind: "market",
-          marketId: h.marketId,
-          chain,
-          zone: h.zone,
-          termType: h.termType,
-          broker: h.broker || undefined,
-          collateralSymbol: h.collateralSymbol,
-          collateralAddress: h.collateralToken,
-          collateralPrice: h.collateralPrice,
-          loanSymbol: h.loanSymbol,
-          loanAddress: h.loanToken,
-          loanPrice: h.loanPrice,
-          supplyApy: h.supplyApy,
-          borrowRate: "0",
-          collateral: "0",
-          collateralUsd: "0",
-          borrowed: "0",
-          borrowedUsd: "0",
-          ltv: "0",
-          lltv: h.zone === 3 ? "0.909" : "0",
-          health: "0",
-          liquidationPriceRate: "0",
-          walletCollateralBalance: "0",
-          walletLoanBalance: "0",
-          isWhitelisted: false,
-          error: message,
-        };
+        return mapMarketErrorPosition(h, chain, message);
       }
     }
   );

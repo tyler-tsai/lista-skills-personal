@@ -14,13 +14,18 @@ const CONFIG_FILE = join(CONFIG_DIR, "lending-config.json");
 export const DEFAULT_RPCS: Record<string, string[]> = {
   "eip155:56": [
     "https://bsc-dataseed.binance.org",
+    "https://bsc-dataseed1.bnbchain.org",
+    "https://bsc-dataseed2.bnbchain.org",
+    "https://bsc-dataseed3.bnbchain.org",
+    "https://bsc-rpc.publicnode.com",
     "https://bsc-dataseed1.binance.org",
-    "https://bsc-dataseed2.binance.org",
   ],
   "eip155:1": [
-    "https://eth.llamarpc.com",
+    "https://eth.drpc.org",
+    "https://mainnet.gateway.tenderly.co",
+    "https://ethereum-rpc.publicnode.com",
     "https://cloudflare-eth.com",
-    "https://rpc.ankr.com/eth",
+    "https://eth.llamarpc.com",
   ],
 };
 
@@ -171,4 +176,64 @@ export function getChainId(chain: string): number {
     );
   }
   return chainId;
+}
+
+/**
+ * Check if using custom RPC (vs default public RPC)
+ */
+export function isUsingCustomRpc(chain: string): boolean {
+  const config = loadConfig();
+  return !!config.rpcUrls[chain];
+}
+
+/**
+ * RPC configuration type
+ */
+export type RpcType = "public" | "custom";
+
+/**
+ * Get RPC type for a chain
+ */
+export function getRpcType(chain: string): RpcType {
+  return isUsingCustomRpc(chain) ? "custom" : "public";
+}
+
+/**
+ * Get optimized concurrency and timeout settings based on RPC type
+ */
+export interface RpcConfig {
+  type: RpcType;
+  vaultConcurrency: number;
+  marketConcurrency: number;
+  itemTimeout: number;
+  totalBudget: number;
+  retryCount: number;
+  retryDelay: number;
+}
+
+export function getRpcConfig(chain: string): RpcConfig {
+  const type = getRpcType(chain);
+
+  if (type === "custom") {
+    return {
+      type: "custom",
+      vaultConcurrency: 5,
+      marketConcurrency: 3,
+      itemTimeout: 8000,
+      totalBudget: 35000,
+      retryCount: 2,
+      retryDelay: 500,
+    };
+  }
+
+  // Public RPC: conservative settings to avoid rate limits
+  return {
+    type: "public",
+    vaultConcurrency: 2,
+    marketConcurrency: 1,
+    itemTimeout: 12000,
+    totalBudget: 70000,
+    retryCount: 3,
+    retryDelay: 800,
+  };
 }

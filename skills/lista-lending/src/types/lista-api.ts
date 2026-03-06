@@ -69,6 +69,9 @@ export interface ApiMarketPosition {
   chain: string;
   zone: number;
   termType: number;
+  isSmartLending: boolean;
+  isFixedTerm: boolean;
+  isActionable: boolean;
   broker?: string;
   collateralSymbol: string;
   collateralAddress: string;

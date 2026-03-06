@@ -37,9 +37,9 @@ const pkgPath = resolve(__dirname, "../package.json");
 const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as SkillPackageJson;
 export const SKILL_VERSION = pkg.version || "0.1.0";
 export const SKILL_NAME = pkg.name || "@lista-dao/lista-lending-skill";
-// Required wallet-connect version for compatibility (single source: package.json)
+// Required lista-wallet-connect version for compatibility (single source: package.json)
 export const WALLET_CONNECT_VERSION =
-  pkg.skillRequires?.["wallet-connect"] || ">=1.0.0";
+  pkg.skillRequires?.["lista-wallet-connect"] || ">=1.0.0";
 
 import { cmdDeposit } from "./commands/deposit.js";
 import { cmdWithdraw } from "./commands/withdraw.js";
@@ -317,7 +317,7 @@ async function main() {
           skill: SKILL_NAME,
           version: SKILL_VERSION,
           dependencies: {
-            "wallet-connect": WALLET_CONNECT_VERSION,
+            "lista-wallet-connect": WALLET_CONNECT_VERSION,
           },
           hint: "If version mismatch, run: npm install && npm run build",
         }),
