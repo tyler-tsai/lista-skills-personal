@@ -1,10 +1,11 @@
 import type { ParsedArgs } from "../../types.js";
+import { parseUnits } from "viem";
 
 function parseValue(value: string | undefined): string | undefined {
   if (!value || value === "0") return undefined;
   if (value.startsWith("0x")) return value;
   if (value.includes(".")) {
-    const wei = BigInt(Math.round(parseFloat(value) * 1e18));
+    const wei = parseUnits(value, 18);
     return "0x" + wei.toString(16);
   }
   return "0x" + BigInt(value).toString(16);
