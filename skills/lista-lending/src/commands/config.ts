@@ -6,7 +6,6 @@ import {
   loadConfig,
   setRpcUrl,
   clearRpcUrl,
-  setDebug,
   getRpcUrl,
   DEFAULT_RPCS,
   SUPPORTED_CHAINS,
@@ -16,8 +15,6 @@ export interface ConfigArgs {
   show?: boolean;
   setRpc?: boolean;
   clearRpc?: boolean;
-  setDebug?: boolean;
-  clearDebug?: boolean;
   chain?: string;
   url?: string;
 }
@@ -26,7 +23,7 @@ export async function cmdConfig(args: ConfigArgs): Promise<void> {
   // Show current config
   if (
     args.show ||
-    (!args.setRpc && !args.clearRpc && !args.setDebug && !args.clearDebug)
+    (!args.setRpc && !args.clearRpc)
   ) {
     const config = loadConfig();
 
@@ -46,7 +43,6 @@ export async function cmdConfig(args: ConfigArgs): Promise<void> {
       JSON.stringify(
         {
           defaultChain: config.defaultChain,
-          debug: config.debug,
           supportedChains: SUPPORTED_CHAINS,
           rpcUrls: rpcStatus,
           configFile: "~/.agent-wallet/lending-config.json",
@@ -54,32 +50,6 @@ export async function cmdConfig(args: ConfigArgs): Promise<void> {
         null,
         2
       )
-    );
-    return;
-  }
-
-  // Enable persistent debug output
-  if (args.setDebug) {
-    setDebug(true);
-    console.log(
-      JSON.stringify({
-        status: "success",
-        action: "set_debug",
-        debug: true,
-      })
-    );
-    return;
-  }
-
-  // Disable persistent debug output
-  if (args.clearDebug) {
-    setDebug(false);
-    console.log(
-      JSON.stringify({
-        status: "success",
-        action: "set_debug",
-        debug: false,
-      })
     );
     return;
   }

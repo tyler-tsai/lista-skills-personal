@@ -37,38 +37,9 @@ export interface SelectedMarket {
   termType?: number;
 }
 
-export enum OperationType {
-  SelectVault = "select_vault",
-  SelectMarket = "select_market",
-  Deposit = "deposit",
-  Withdraw = "withdraw",
-  Supply = "supply",
-  Borrow = "borrow",
-  Repay = "repay",
-  MarketWithdraw = "market_withdraw",
-}
-
 export enum TargetType {
   Vault = "vault",
   Market = "market",
-}
-
-export enum OperationStatus {
-  Success = "success",
-  Failed = "failed",
-  Pending = "pending",
-}
-
-export interface LastOperation {
-  type: OperationType;
-  targetType: TargetType;
-  targetId: string;
-  chain: string;
-  amount?: string;
-  symbol?: string;
-  txHash?: string;
-  status: OperationStatus;
-  at: string;
 }
 
 export interface LastFilters {
@@ -84,7 +55,6 @@ export interface LendingContext {
   userAddress: string | null;
   walletTopic: string | null;
   userPosition: UserPosition | null;
-  lastOperation: LastOperation | null;
   lastFilters: LastFilters | null;
   lastUpdated: string | null;
 }
@@ -96,7 +66,6 @@ const DEFAULT_CONTEXT: LendingContext = {
   userAddress: null,
   walletTopic: null,
   userPosition: null,
-  lastOperation: null,
   lastFilters: null,
   lastUpdated: null,
 };
@@ -143,31 +112,6 @@ function isUserPosition(value: unknown): value is UserPosition {
   );
 }
 
-function isLastOperation(value: unknown): value is LastOperation {
-  if (!isObject(value)) return false;
-  const operationType = value.type;
-  const targetType = value.targetType;
-  const status = value.status;
-
-  const validOperationType = Object.values(OperationType).includes(
-    operationType as OperationType
-  );
-  const validTargetType = Object.values(TargetType).includes(
-    targetType as TargetType
-  );
-  const validStatus = Object.values(OperationStatus).includes(
-    status as OperationStatus
-  );
-  return (
-    validOperationType &&
-    validTargetType &&
-    typeof value.targetId === "string" &&
-    typeof value.chain === "string" &&
-    validStatus &&
-    typeof value.at === "string"
-  );
-}
-
 function isLastFilters(value: unknown): value is LastFilters {
   return isObject(value);
 }
@@ -189,9 +133,6 @@ function migrateContext(raw: unknown): LendingContext {
   const userPosition = isUserPosition(old.userPosition)
     ? old.userPosition
     : null;
-  const lastOperation = isLastOperation(old.lastOperation)
-    ? old.lastOperation
-    : null;
   const lastFilters = isLastFilters(old.lastFilters)
     ? old.lastFilters
     : null;
@@ -205,7 +146,6 @@ function migrateContext(raw: unknown): LendingContext {
     walletTopic:
       typeof old.walletTopic === "string" ? old.walletTopic : base.walletTopic,
     userPosition,
-    lastOperation,
     lastFilters,
     lastUpdated:
       typeof old.lastUpdated === "string" ? old.lastUpdated : base.lastUpdated,
@@ -278,15 +218,6 @@ export function setSelectedMarket(
 export function updatePosition(position: UserPosition): void {
   const context = loadContext();
   context.userPosition = position;
-  saveContext(context);
-}
-
-/**
- * Record the last operation for follow-up actions.
- */
-export function setLastOperation(operation: LastOperation): void {
-  const context = loadContext();
-  context.lastOperation = operation;
   saveContext(context);
 }
 

@@ -8,24 +8,21 @@ import { getSDK, getChainId, SUPPORTED_CHAINS } from "../sdk.js";
 import { executeSteps } from "../executor.js";
 import {
   loadContext,
-  OperationStatus,
-  OperationType,
   TargetType,
 } from "../context.js";
-import type { ParsedArgs, StepParam } from "../types.js";
+import type { ParsedArgs } from "../types.js";
 import { mapMarketUserPosition } from "../utils/position.js";
 import { InputValidationError, parsePositiveUnits } from "../utils/validators.js";
 import {
   requireAmount,
   resolveMarketContext,
 } from "./shared/context.js";
-import { printJson, printDebug, exitWithCode } from "./shared/output.js";
+import { printJson, exitWithCode } from "./shared/output.js";
 import {
   buildExecutionFailureOutput,
   buildPendingExecutionOutput,
   ensureStepsGenerated,
 } from "./shared/tx.js";
-import { recordOperation } from "./shared/operation.js";
 import { buildSdkErrorOutput } from "./shared/errors.js";
 import { buildMarketPositionPayload } from "./shared/market.js";
 
@@ -50,7 +47,6 @@ export async function cmdSupply(args: ParsedArgs): Promise<void> {
     const sdk = getSDK();
 
     // 1. Get market info for collateral decimals
-    printDebug({ action: "fetching_market_info", market: marketId, chain });
     const marketInfo = await sdk.getWriteConfig(chainId, marketId);
     const collateralInfo = marketInfo.collateralInfo;
     const decimals = collateralInfo.decimals;
@@ -58,25 +54,6 @@ export async function cmdSupply(args: ParsedArgs): Promise<void> {
     // 2. Parse amount with correct decimals
     const assets = parsePositiveUnits(amount, decimals, "amount");
     operationContext = { marketId, chain, amount };
-    const operationRecord = {
-      type: OperationType.Supply,
-      targetType: TargetType.Market,
-      targetId: marketId,
-      chain,
-      amount,
-      symbol: collateralInfo.symbol,
-    };
-
-    printDebug({
-      action: "building_supply",
-      market: marketId,
-      chain,
-      collateral: collateralInfo.symbol,
-      amount,
-      decimals,
-      rawAmount: assets.toString(),
-    });
-
     // 3. Build supply steps (may include approve step)
     const steps = ensureStepsGenerated(
       await sdk.buildSupplyParams({
@@ -88,12 +65,6 @@ export async function cmdSupply(args: ParsedArgs): Promise<void> {
       })
     );
 
-    printDebug({
-      action: "executing_steps",
-      count: steps.length,
-      types: steps.map((s: StepParam) => s.step),
-    });
-
     // 4. Execute steps via lista-wallet-connect
     const results = await executeSteps(steps, {
       topic: walletTopic!,
@@ -104,32 +75,17 @@ export async function cmdSupply(args: ParsedArgs): Promise<void> {
     const lastResult = results[results.length - 1];
 
     if (lastResult.status === "pending") {
-      recordOperation(operationRecord, OperationStatus.Pending, lastResult.txHash);
-
       printJson(buildPendingExecutionOutput(lastResult, results, steps.length));
       exitWithCode(0);
     }
 
     if (lastResult.status === "sent") {
       // 6. Re-query position on-chain after successful supply
-      printDebug({ action: "refreshing_position" });
-
       const userData = await sdk.getMarketUserData(chainId, marketId, walletAddress);
       const mappedPosition = mapMarketUserPosition(userData, {
         collateralPrice: 0,
         loanPrice: 0,
       });
-
-      printDebug({
-        action: "position_debug",
-        collateral: mappedPosition.collateral,
-        borrowed: mappedPosition.borrowed,
-        ltv: mappedPosition.ltv,
-        lltv: mappedPosition.lltv,
-        loanable: userData.loanable?.toFixed(8),
-      });
-
-      recordOperation(operationRecord, OperationStatus.Success, lastResult.txHash);
 
       printJson({
         status: "success",
@@ -150,8 +106,6 @@ export async function cmdSupply(args: ParsedArgs): Promise<void> {
       exitWithCode(0);
     }
 
-    recordOperation(operationRecord, OperationStatus.Failed);
-
     printJson(buildExecutionFailureOutput(results, steps.length));
     exitWithCode(1);
   } catch (err) {
@@ -171,19 +125,6 @@ export async function cmdSupply(args: ParsedArgs): Promise<void> {
         targetId: operationContext?.marketId,
       })
     );
-
-    if (operationContext) {
-      recordOperation(
-        {
-          type: OperationType.Supply,
-          targetType: TargetType.Market,
-          targetId: operationContext.marketId,
-          chain: operationContext.chain,
-          amount: operationContext.amount,
-        },
-        OperationStatus.Failed
-      );
-    }
     exitWithCode(1);
   }
 }

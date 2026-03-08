@@ -40,13 +40,11 @@ export const SUPPORTED_CHAINS = ["eip155:56", "eip155:1"];
 export interface LendingConfig {
   rpcUrls: Record<string, string>; // Custom RPC overrides
   defaultChain: string;
-  debug: boolean;
 }
 
 const DEFAULT_CONFIG: LendingConfig = {
   rpcUrls: {},
   defaultChain: "eip155:56",
-  debug: false,
 };
 
 /**
@@ -69,7 +67,6 @@ export function loadConfig(): LendingConfig {
       return {
         ...DEFAULT_CONFIG,
         ...parsed,
-        debug: parsed.debug === true,
       };
     }
   } catch {
@@ -147,22 +144,6 @@ export function clearRpcUrl(chain: string): void {
   const config = loadConfig();
   delete config.rpcUrls[chain];
   saveConfig(config);
-}
-
-/**
- * Set debug mode for command-level printDebug output.
- */
-export function setDebug(enabled: boolean): void {
-  const config = loadConfig();
-  config.debug = enabled;
-  saveConfig(config);
-}
-
-/**
- * Get persisted debug mode from config.
- */
-export function isDebugEnabled(): boolean {
-  return loadConfig().debug === true;
 }
 
 /**

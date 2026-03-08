@@ -9,7 +9,7 @@ description: Connect wallets via WalletConnect v2 and execute EVM signing/transa
 
 > **Version:** 1.0.0
 > **Status:** Pre-release (not public, skip registry verification)
-> **Verify:** `npx tsx src/cli.ts version`
+> **Verify:** `node dist/cli.js version`
 > **If outdated:** `npm install && npm run build`
 
 Wallet connection and transaction bridge skill for EVM (`eip155:1`, `eip155:56`).
@@ -299,4 +299,3 @@ node skills/lista-wallet-connect/dist/cli.js whoami --topic <topic>
 - `lista-lending` executes transactions by calling this skill's `call` command.
 - Keep both skills aligned on chain/RPC configuration.
 - For debugging send flow issues, inspect `stderr` from both skills.
-

@@ -15,7 +15,6 @@ export interface ParsedArgs {
   // Wallet connection
   walletTopic?: string;
   walletAddress?: string;
-  debug?: boolean;
   // Vault operations
   withdrawAll?: boolean;
   // Market operations

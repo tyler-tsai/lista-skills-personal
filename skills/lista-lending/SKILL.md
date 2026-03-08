@@ -1,6 +1,6 @@
 ---
 name: lista-lending
-version: 0.1.0
+version: 0.1.1
 repository: https://github.com/lista-dao/lista-skills
 requires:
   lista-wallet-connect: ">=1.0.0"
@@ -9,10 +9,10 @@ description: View and operate Lista Lending vaults/markets. Use when user asks a
 
 # Lista Lending Skill (POC)
 
-> **Version:** 0.1.0
+> **Version:** 0.1.1
 > **Status:** Pre-release (not public, skip registry verification)
 > **Requires:** lista-wallet-connect >= 1.0.0
-> **Verify:** `npx tsx src/cli.ts version`
+> **Verify:** `node dist/cli.js version`
 > **If outdated:** `npm install && npm run build`
 
 Execute Lista Lending vault and market operations through `@lista-dao/moolah-lending-sdk`, with transaction sending delegated to `lista-wallet-connect`.
@@ -115,6 +115,7 @@ skills/lista-lending/
 1. Wallet is paired via `lista-wallet-connect` skill.
 2. You have a valid `wallet-topic` and `wallet-address`.
 3. `lista-wallet-connect` is built (`skills/lista-wallet-connect/dist/cli.js` exists).
+4. `lista-lending` is built (`skills/lista-lending/dist/cli.js` exists).
 
 ## Setup
 
@@ -130,13 +131,13 @@ Run commands from this folder:
 
 ```bash
 cd skills/lista-lending
-npx tsx src/cli.ts <command> [options]
+node dist/cli.js <command> [options]
 ```
 
 ## Output Contract
 
 - `stdout`: machine-readable JSON (result payload)
-- `stderr`: debug/diagnostic logs (`--debug` or persistent debug config)
+- `stderr`: errors only
 
 ## Agent Display Guidelines
 
@@ -185,7 +186,7 @@ Health definition (for market positions):
 ## Command Index
 
 - `version` - show skill version and compatibility hints
-- `config` - read/update RPC and debug settings
+- `config` - read/update RPC settings
 - `vaults` - list vaults with filters
 - `markets` - list markets with filters (SmartLending/fixed-term filtered)
 - `holdings` - query user positions across vault + market
@@ -194,7 +195,7 @@ Health definition (for market positions):
 - `withdraw` - withdraw from selected/explicit vault
 - `supply` - supply collateral to selected/explicit market
 - `borrow` - simulate or execute borrow
-- `repay` - repay debt in selected/explicit market
+- `repay` - simulate or execute repay
 - `market-withdraw` - withdraw supplied collateral from selected/explicit market
 
 ## Global/Shared Options
@@ -202,7 +203,6 @@ Health definition (for market positions):
 - `--chain <eip155:56|eip155:1>`
 - `--wallet-topic <topic>`
 - `--wallet-address <0x...>`
-- `--debug` (one-time debug for current command)
 
 ## Command Details
 
@@ -211,28 +211,25 @@ Health definition (for market positions):
 Purpose: Print skill version and dependency constraints.
 
 ```bash
-npx tsx src/cli.ts version
+node dist/cli.js version
 ```
 
 ### 2) `config`
 
-Purpose: Manage RPC override and debug mode.
+Purpose: Manage RPC override.
 
 Examples:
 
 ```bash
 # show config
-npx tsx src/cli.ts config --show
+node dist/cli.js config --show
 
 # set rpc override
-npx tsx src/cli.ts config --set-rpc --chain eip155:56 --url https://bsc-mainnet.nodereal.io/v1/<key>
+node dist/cli.js config --set-rpc --chain eip155:56 --url https://bsc-mainnet.nodereal.io/v1/<key>
 
 # clear rpc override
-npx tsx src/cli.ts config --clear-rpc --chain eip155:56
+node dist/cli.js config --clear-rpc --chain eip155:56
 
-# persistent debug toggle
-npx tsx src/cli.ts config --set-debug
-npx tsx src/cli.ts config --clear-debug
 ```
 
 Notes:
@@ -253,10 +250,10 @@ Common options:
 Examples:
 
 ```bash
-npx tsx src/cli.ts vaults
-npx tsx src/cli.ts vaults --chain eip155:1
-npx tsx src/cli.ts vaults --sort apy --order desc --page 1 --page-size 10
-npx tsx src/cli.ts vaults --assets 0x8d0d...,0x55d3... --curators "Lista DAO,Pangolins"
+node dist/cli.js vaults
+node dist/cli.js vaults --chain eip155:1
+node dist/cli.js vaults --sort apy --order desc --page 1 --page-size 10
+node dist/cli.js vaults --assets 0x8d0d...,0x55d3... --curators "Lista DAO,Pangolins"
 ```
 
 ### 4) `markets`
@@ -272,9 +269,9 @@ Common options:
 Examples:
 
 ```bash
-npx tsx src/cli.ts markets
-npx tsx src/cli.ts markets --chain eip155:56 --sort liquidity --order desc --page-size 20
-npx tsx src/cli.ts markets --loans USD1,USDT --collaterals USD1,BTCB
+node dist/cli.js markets
+node dist/cli.js markets --chain eip155:56 --sort liquidity --order desc --page-size 20
+node dist/cli.js markets --loans USD1,USDT --collaterals USD1,BTCB
 ```
 
 Notes:
@@ -296,16 +293,16 @@ Examples:
 
 ```bash
 # all positions (vault + market)
-npx tsx src/cli.ts holdings --address 0xYOUR_ADDRESS
+node dist/cli.js holdings --address 0xYOUR_ADDRESS
 
 # only vault positions
-npx tsx src/cli.ts holdings --address 0xYOUR_ADDRESS --scope vault
+node dist/cli.js holdings --address 0xYOUR_ADDRESS --scope vault
 
 # only market positions
-npx tsx src/cli.ts holdings --address 0xYOUR_ADDRESS --scope market
+node dist/cli.js holdings --address 0xYOUR_ADDRESS --scope market
 
 # only currently selected position
-npx tsx src/cli.ts holdings --scope selected
+node dist/cli.js holdings --scope selected
 ```
 
 Market position fields include:
@@ -332,22 +329,22 @@ Examples:
 
 ```bash
 # select vault
-npx tsx src/cli.ts select \
+node dist/cli.js select \
   --vault 0xfa27f172e0b6ebcef9c51abf817e2cb142fbe627 \
   --chain eip155:56 \
   --wallet-topic <topic> \
   --wallet-address 0xYOUR_ADDRESS
 
 # select market
-npx tsx src/cli.ts select \
+node dist/cli.js select \
   --market 0xd384584abf6504425c9873f34a63372625d46cd1f2e79aeedc77475cacaca922 \
   --chain eip155:56 \
   --wallet-topic <topic> \
   --wallet-address 0xYOUR_ADDRESS
 
 # show/clear
-npx tsx src/cli.ts select --show
-npx tsx src/cli.ts select --clear
+node dist/cli.js select --show
+node dist/cli.js select --clear
 ```
 
 Notes:
@@ -368,10 +365,10 @@ Example:
 
 ```bash
 # using selected vault
-npx tsx src/cli.ts deposit --amount 1
+node dist/cli.js deposit --amount 1
 
 # explicit target
-npx tsx src/cli.ts deposit \
+node dist/cli.js deposit \
   --vault 0xVAULT \
   --amount 1 \
   --chain eip155:56 \
@@ -390,8 +387,8 @@ Required:
 Examples:
 
 ```bash
-npx tsx src/cli.ts withdraw --amount 0.5
-npx tsx src/cli.ts withdraw --withdraw-all
+node dist/cli.js withdraw --amount 0.5
+node dist/cli.js withdraw --withdraw-all
 ```
 
 ### 9) `supply`
@@ -406,7 +403,7 @@ Required:
 Example:
 
 ```bash
-npx tsx src/cli.ts supply --amount 2
+node dist/cli.js supply --amount 2
 ```
 
 ### 10) `borrow`
@@ -423,28 +420,37 @@ Examples:
 
 ```bash
 # check max borrowable
-npx tsx src/cli.ts borrow --simulate
+node dist/cli.js borrow --simulate
 
 # check max after hypothetical supply
-npx tsx src/cli.ts borrow --simulate --simulate-supply 2
+node dist/cli.js borrow --simulate --simulate-supply 2
 
 # execute borrow
-npx tsx src/cli.ts borrow --amount 0.01
+node dist/cli.js borrow --amount 0.01
 ```
 
 ### 11) `repay`
 
-Purpose: Repay market debt.
+Purpose: Repay market debt, or simulate repay impact.
 
-Required:
+Modes:
 
-- one of `--amount` or `--repay-all`
+- simulate repay amount: `--simulate --amount <amt>`
+- simulate repay-all: `--simulate --repay-all`
+- execute repay: `--amount <amt>` or `--repay-all`
 
 Examples:
 
 ```bash
-npx tsx src/cli.ts repay --amount 0.01
-npx tsx src/cli.ts repay --repay-all
+# simulate partial repay impact
+node dist/cli.js repay --simulate --amount 0.01
+
+# simulate full repay impact
+node dist/cli.js repay --simulate --repay-all
+
+# execute
+node dist/cli.js repay --amount 0.01
+node dist/cli.js repay --repay-all
 ```
 
 ### 12) `market-withdraw`
@@ -458,8 +464,8 @@ Required:
 Examples:
 
 ```bash
-npx tsx src/cli.ts market-withdraw --amount 0.5
-npx tsx src/cli.ts market-withdraw --withdraw-all
+node dist/cli.js market-withdraw --amount 0.5
+node dist/cli.js market-withdraw --withdraw-all
 ```
 
 ## Transaction Behavior
@@ -475,31 +481,32 @@ npx tsx src/cli.ts market-withdraw --withdraw-all
 
 ```bash
 # 1) discover
-npx tsx src/cli.ts vaults --chain eip155:56
+node dist/cli.js vaults --chain eip155:56
 
 # 2) select
-npx tsx src/cli.ts select --vault 0xVAULT --wallet-topic <topic> --wallet-address 0xADDR
+node dist/cli.js select --vault 0xVAULT --wallet-topic <topic> --wallet-address 0xADDR
 
 # 3) operate
-npx tsx src/cli.ts deposit --amount 1
-npx tsx src/cli.ts withdraw --amount 0.5
+node dist/cli.js deposit --amount 1
+node dist/cli.js withdraw --amount 0.5
 ```
 
 ### Market flow
 
 ```bash
 # 1) discover
-npx tsx src/cli.ts markets --chain eip155:56
+node dist/cli.js markets --chain eip155:56
 
 # 2) select
-npx tsx src/cli.ts select --market 0xMARKET --wallet-topic <topic> --wallet-address 0xADDR
+node dist/cli.js select --market 0xMARKET --wallet-topic <topic> --wallet-address 0xADDR
 
 # 3) operate
-npx tsx src/cli.ts supply --amount 2
-npx tsx src/cli.ts borrow --simulate
-npx tsx src/cli.ts borrow --amount 0.01
-npx tsx src/cli.ts repay --amount 0.01
-npx tsx src/cli.ts market-withdraw --amount 1
+node dist/cli.js supply --amount 2
+node dist/cli.js borrow --simulate
+node dist/cli.js borrow --amount 0.01
+node dist/cli.js repay --simulate --amount 0.01
+node dist/cli.js repay --amount 0.01
+node dist/cli.js market-withdraw --amount 1
 ```
 
 ## Security Checklist

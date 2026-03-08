@@ -8,26 +8,23 @@ import { getSDK, getChainId, SUPPORTED_CHAINS } from "../sdk.js";
 import { executeSteps } from "../executor.js";
 import {
   loadContext,
-  OperationStatus,
-  OperationType,
   TargetType,
   updatePosition,
   type UserPosition,
 } from "../context.js";
-import type { ParsedArgs, StepParam } from "../types.js";
+import type { ParsedArgs } from "../types.js";
 import { mapVaultUserPosition } from "../utils/position.js";
 import { InputValidationError, parsePositiveUnits } from "../utils/validators.js";
 import {
   requireAmountOrAll,
   resolveVaultContext,
 } from "./shared/context.js";
-import { printJson, printDebug, exitWithCode } from "./shared/output.js";
+import { printJson, exitWithCode } from "./shared/output.js";
 import {
   buildExecutionFailureOutput,
   buildPendingExecutionOutput,
   ensureStepsGenerated,
 } from "./shared/tx.js";
-import { recordOperation } from "./shared/operation.js";
 import { buildSdkErrorOutput } from "./shared/errors.js";
 
 export async function cmdWithdraw(args: ParsedArgs): Promise<void> {
@@ -51,11 +48,9 @@ export async function cmdWithdraw(args: ParsedArgs): Promise<void> {
     const sdk = getSDK();
 
     // 1. Get vault info
-    printDebug({ action: "fetching_vault_info", vault: vaultAddress, chain });
     const vaultInfo = await sdk.getVaultInfo(chainId, vaultAddress);
 
     // 2. Get user data (required for withdraw-all)
-    printDebug({ action: "fetching_user_data", wallet: walletAddress });
     const userData = await sdk.getVaultUserData(
       chainId,
       vaultAddress,
@@ -87,23 +82,6 @@ export async function cmdWithdraw(args: ParsedArgs): Promise<void> {
       chain,
       amount: operationAmount,
     };
-    const operationRecord = {
-      type: OperationType.Withdraw,
-      targetType: TargetType.Vault,
-      targetId: vaultAddress,
-      chain,
-      amount: operationAmount,
-      symbol: assetInfo.symbol,
-    };
-
-    printDebug({
-      action: "building_withdraw",
-      vault: vaultAddress,
-      chain,
-      asset: assetInfo.symbol,
-      amount: args.amount,
-      withdrawAll: args.withdrawAll,
-    });
 
     // 4. Build withdraw steps
     const steps = ensureStepsGenerated(
@@ -118,12 +96,6 @@ export async function cmdWithdraw(args: ParsedArgs): Promise<void> {
       })
     );
 
-    printDebug({
-      action: "executing_steps",
-      count: steps.length,
-      types: steps.map((s: StepParam) => s.step),
-    });
-
     // 5. Execute steps via lista-wallet-connect
     const results = await executeSteps(steps, {
       topic: walletTopic!,
@@ -134,16 +106,12 @@ export async function cmdWithdraw(args: ParsedArgs): Promise<void> {
     const lastResult = results[results.length - 1];
 
     if (lastResult.status === "pending") {
-      recordOperation(operationRecord, OperationStatus.Pending, lastResult.txHash);
-
       printJson(buildPendingExecutionOutput(lastResult, results, steps.length));
       exitWithCode(0);
     }
 
     if (lastResult.status === "sent") {
       // 7. Re-query position on-chain after successful withdraw
-      printDebug({ action: "refreshing_position" });
-
       // Re-fetch vault info to get fresh state after withdraw
       const freshVaultInfo = await sdk.getVaultInfo(chainId, vaultAddress);
       const newUserData = await sdk.getVaultUserData(
@@ -155,23 +123,12 @@ export async function cmdWithdraw(args: ParsedArgs): Promise<void> {
 
       const mappedPosition = mapVaultUserPosition(newUserData);
 
-      printDebug({
-        action: "position_debug",
-        userShares: mappedPosition.shares,
-        vaultBalance: mappedPosition.assets,
-        walletBalance: mappedPosition.walletBalance,
-        totalAssets: freshVaultInfo.totalAssets?.toFixed(8),
-        totalSupply: freshVaultInfo.totalSupply?.toFixed(8),
-      });
-
       const newPosition: UserPosition = mappedPosition.position;
 
       // Update context if this is the selected vault
       if (ctx.selectedVault?.address === vaultAddress) {
         updatePosition(newPosition);
       }
-
-      recordOperation(operationRecord, OperationStatus.Success, lastResult.txHash);
 
       printJson({
         status: "success",
@@ -193,8 +150,6 @@ export async function cmdWithdraw(args: ParsedArgs): Promise<void> {
       });
       exitWithCode(0);
     }
-
-    recordOperation(operationRecord, OperationStatus.Failed);
 
     printJson(buildExecutionFailureOutput(results, steps.length));
     exitWithCode(1);
@@ -218,19 +173,6 @@ export async function cmdWithdraw(args: ParsedArgs): Promise<void> {
         insufficientKeywords: ["insufficient", "exceeds balance"],
       })
     );
-
-    if (operationContext) {
-      recordOperation(
-        {
-          type: OperationType.Withdraw,
-          targetType: TargetType.Vault,
-          targetId: operationContext.vaultAddress,
-          chain: operationContext.chain,
-          amount: operationContext.amount,
-        },
-        OperationStatus.Failed
-      );
-    }
     exitWithCode(1);
   }
 }

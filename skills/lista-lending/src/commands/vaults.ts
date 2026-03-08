@@ -72,21 +72,6 @@ export async function cmdVaults(args: VaultsArgs): Promise<void> {
   }
 
   try {
-    console.error(
-      JSON.stringify({
-        action: "fetching_vaults",
-        chain,
-        page: args.page,
-        pageSize: args.pageSize,
-        sort: args.sort,
-        order: args.order,
-        zone: args.zone,
-        keyword: args.keyword,
-        assets: args.assets,
-        curators: args.curators,
-      })
-    );
-
     const vaults = await fetchVaults({
       chain,
       page: args.page,

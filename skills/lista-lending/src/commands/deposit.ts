@@ -9,8 +9,6 @@ import { getSDK, getChainId, SUPPORTED_CHAINS } from "../sdk.js";
 import { executeSteps } from "../executor.js";
 import {
   loadContext,
-  OperationStatus,
-  OperationType,
   TargetType,
   updatePosition,
   type UserPosition,
@@ -21,13 +19,12 @@ import {
   resolveVaultContext,
   requireAmount,
 } from "./shared/context.js";
-import { printJson, printDebug, exitWithCode } from "./shared/output.js";
+import { printJson, exitWithCode } from "./shared/output.js";
 import {
   buildExecutionFailureOutput,
   buildPendingExecutionOutput,
   ensureStepsGenerated,
 } from "./shared/tx.js";
-import { recordOperation } from "./shared/operation.js";
 import { buildSdkErrorOutput } from "./shared/errors.js";
 
 export async function cmdDeposit(args: ParsedArgs): Promise<void> {
@@ -56,32 +53,12 @@ export async function cmdDeposit(args: ParsedArgs): Promise<void> {
     };
 
     // 1. Get vault info to determine asset decimals
-    printDebug({ action: "fetching_vault_info", vault: vaultAddress, chain });
     const vaultInfo = await sdk.getVaultInfo(chainId, vaultAddress);
 
     // 2. Parse amount with correct decimals (SDK uses assetInfo)
     const assetInfo = vaultInfo.assetInfo;
     const decimals = assetInfo.decimals;
     const assets = parsePositiveUnits(amount, decimals, "amount");
-    const operationRecord = {
-      type: OperationType.Deposit,
-      targetType: TargetType.Vault,
-      targetId: vaultAddress,
-      chain,
-      amount,
-      symbol: assetInfo.symbol,
-    };
-
-    printDebug({
-      action: "building_deposit",
-      vault: vaultAddress,
-      chain,
-      asset: assetInfo.symbol,
-      amount,
-      decimals,
-      rawAmount: assets.toString(),
-    });
-
     // 3. Build deposit steps (may include approve step)
     const steps = ensureStepsGenerated(
       await sdk.buildVaultDepositParams({
@@ -93,12 +70,6 @@ export async function cmdDeposit(args: ParsedArgs): Promise<void> {
       })
     );
 
-    printDebug({
-      action: "executing_steps",
-      count: steps.length,
-      types: steps.map((s: StepParam) => s.step),
-    });
-
     // 4. Execute steps via lista-wallet-connect
     const results = await executeSteps(steps, {
       topic: walletTopic!,
@@ -109,16 +80,12 @@ export async function cmdDeposit(args: ParsedArgs): Promise<void> {
     const lastResult = results[results.length - 1];
 
     if (lastResult.status === "pending") {
-      recordOperation(operationRecord, OperationStatus.Pending, lastResult.txHash);
-
       printJson(buildPendingExecutionOutput(lastResult, results, steps.length));
       exitWithCode(0);
     }
 
     if (lastResult.status === "sent") {
       // 6. Re-query position on-chain after successful deposit
-      printDebug({ action: "refreshing_position" });
-
       // Re-fetch vault info to get fresh state after deposit
       const freshVaultInfo = await sdk.getVaultInfo(chainId, vaultAddress);
       const userData = await sdk.getVaultUserData(
@@ -130,23 +97,12 @@ export async function cmdDeposit(args: ParsedArgs): Promise<void> {
 
       const mappedPosition = mapVaultUserPosition(userData);
 
-      printDebug({
-        action: "position_debug",
-        userShares: mappedPosition.shares,
-        vaultBalance: mappedPosition.assets,
-        walletBalance: mappedPosition.walletBalance,
-        totalAssets: freshVaultInfo.totalAssets?.toFixed(8),
-        totalSupply: freshVaultInfo.totalSupply?.toFixed(8),
-      });
-
       const newPosition: UserPosition = mappedPosition.position;
 
       // Update context if this is the selected vault
       if (ctx.selectedVault?.address === vaultAddress) {
         updatePosition(newPosition);
       }
-
-      recordOperation(operationRecord, OperationStatus.Success, lastResult.txHash);
 
       printJson({
         status: "success",
@@ -169,8 +125,6 @@ export async function cmdDeposit(args: ParsedArgs): Promise<void> {
       exitWithCode(0);
     }
 
-    recordOperation(operationRecord, OperationStatus.Failed);
-
     printJson(buildExecutionFailureOutput(results, steps.length));
     exitWithCode(1);
   } catch (err) {
@@ -190,19 +144,6 @@ export async function cmdDeposit(args: ParsedArgs): Promise<void> {
         targetId: operationContext?.vaultAddress,
       })
     );
-
-    if (operationContext) {
-      recordOperation(
-        {
-          type: OperationType.Deposit,
-          targetType: TargetType.Vault,
-          targetId: operationContext.vaultAddress,
-          chain: operationContext.chain,
-          amount: operationContext.amount,
-        },
-        OperationStatus.Failed
-      );
-    }
     exitWithCode(1);
   }
 }

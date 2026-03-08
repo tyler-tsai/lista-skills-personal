@@ -7,28 +7,31 @@
  * - --withdraw-all: Withdraw all collateral (only if no debt)
  */
 
-import { getSDK, getChainId, SUPPORTED_CHAINS } from "../sdk.js";
+import { Decimal } from "@lista-dao/moolah-sdk-core";
+import {
+  getSDK,
+  getChainId,
+  SUPPORTED_CHAINS,
+  getMarketRuntimeData,
+} from "../sdk.js";
 import { executeSteps } from "../executor.js";
 import {
   loadContext,
-  OperationStatus,
-  OperationType,
   TargetType,
 } from "../context.js";
-import type { ParsedArgs, StepParam } from "../types.js";
+import type { ParsedArgs } from "../types.js";
 import { mapMarketUserPosition } from "../utils/position.js";
 import { InputValidationError, parsePositiveUnits } from "../utils/validators.js";
 import {
   requireAmountOrAll,
   resolveMarketContext,
 } from "./shared/context.js";
-import { printJson, printDebug, exitWithCode } from "./shared/output.js";
+import { printJson, exitWithCode } from "./shared/output.js";
 import {
   buildExecutionFailureOutput,
   buildPendingExecutionOutput,
   ensureStepsGenerated,
 } from "./shared/tx.js";
-import { recordOperation } from "./shared/operation.js";
 import { buildSdkErrorOutput } from "./shared/errors.js";
 import {
   buildMarketPositionPayload,
@@ -58,9 +61,11 @@ export async function cmdMarketWithdraw(args: ParsedArgs): Promise<void> {
     const sdk = getSDK();
 
     // 1. Get market info and user data
-    printDebug({ action: "fetching_market_info", market: marketId, chain });
-    const marketInfo = await sdk.getWriteConfig(chainId, marketId);
-    const userData = await sdk.getMarketUserData(chainId, marketId, walletAddress);
+    const { marketInfo, userData } = await getMarketRuntimeData(
+      chainId,
+      marketId,
+      walletAddress
+    );
     const collateralInfo = marketInfo.collateralInfo;
 
     // Check if user has collateral to withdraw
@@ -80,10 +85,10 @@ export async function cmdMarketWithdraw(args: ParsedArgs): Promise<void> {
     let assets: bigint | undefined;
     if (args.amount) {
       assets = parsePositiveUnits(args.amount, decimals, "amount");
+      const requestedWithdrawAmount = new Decimal(assets, decimals);
 
       // Check if withdraw amount exceeds withdrawable
-      const requestedAmount = parseFloat(args.amount);
-      if (userData.withdrawable.lt(requestedAmount)) {
+      if (userData.withdrawable.lt(requestedWithdrawAmount)) {
         printJson(
           getExceedsWithdrawableError(args.amount, userData, collateralInfo.symbol)
         );
@@ -97,25 +102,6 @@ export async function cmdMarketWithdraw(args: ParsedArgs): Promise<void> {
       chain,
       amount: operationAmount,
     };
-    const operationRecord = {
-      type: OperationType.MarketWithdraw,
-      targetType: TargetType.Market,
-      targetId: marketId,
-      chain,
-      amount: operationAmount,
-      symbol: collateralInfo.symbol,
-    };
-
-    printDebug({
-      action: "building_withdraw",
-      market: marketId,
-      chain,
-      collateral: collateralInfo.symbol,
-      amount: args.amount,
-      withdrawAll: args.withdrawAll,
-      currentCollateral: userData.collateral.toFixed(8),
-      withdrawable: userData.withdrawable.toFixed(8),
-    });
 
     // 3. Build withdraw steps
     const steps = ensureStepsGenerated(
@@ -130,12 +116,6 @@ export async function cmdMarketWithdraw(args: ParsedArgs): Promise<void> {
       })
     );
 
-    printDebug({
-      action: "executing_steps",
-      count: steps.length,
-      types: steps.map((s: StepParam) => s.step),
-    });
-
     // 4. Execute steps via lista-wallet-connect
     const results = await executeSteps(steps, {
       topic: walletTopic!,
@@ -146,31 +126,17 @@ export async function cmdMarketWithdraw(args: ParsedArgs): Promise<void> {
     const lastResult = results[results.length - 1];
 
     if (lastResult.status === "pending") {
-      recordOperation(operationRecord, OperationStatus.Pending, lastResult.txHash);
-
       printJson(buildPendingExecutionOutput(lastResult, results, steps.length));
       exitWithCode(0);
     }
 
     if (lastResult.status === "sent") {
       // 6. Re-query position on-chain after successful withdraw
-      printDebug({ action: "refreshing_position" });
-
       const newUserData = await sdk.getMarketUserData(chainId, marketId, walletAddress);
       const mappedPosition = mapMarketUserPosition(newUserData, {
         collateralPrice: 0,
         loanPrice: 0,
       });
-
-      printDebug({
-        action: "position_debug",
-        collateral: mappedPosition.collateral,
-        borrowed: mappedPosition.borrowed,
-        ltv: mappedPosition.ltv,
-        withdrawable: newUserData.withdrawable?.toFixed(8),
-      });
-
-      recordOperation(operationRecord, OperationStatus.Success, lastResult.txHash);
 
       printJson({
         status: "success",
@@ -187,8 +153,6 @@ export async function cmdMarketWithdraw(args: ParsedArgs): Promise<void> {
       });
       exitWithCode(0);
     }
-
-    recordOperation(operationRecord, OperationStatus.Failed);
 
     printJson(buildExecutionFailureOutput(results, steps.length));
     exitWithCode(1);
@@ -211,19 +175,6 @@ export async function cmdMarketWithdraw(args: ParsedArgs): Promise<void> {
         insufficientMessage: "Withdraw amount exceeds available withdrawable collateral",
       })
     );
-
-    if (operationContext) {
-      recordOperation(
-        {
-          type: OperationType.MarketWithdraw,
-          targetType: TargetType.Market,
-          targetId: operationContext.marketId,
-          chain: operationContext.chain,
-          amount: operationContext.amount,
-        },
-        OperationStatus.Failed
-      );
-    }
     exitWithCode(1);
   }
 }

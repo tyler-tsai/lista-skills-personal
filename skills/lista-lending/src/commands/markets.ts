@@ -84,21 +84,6 @@ export async function cmdMarkets(args: MarketsArgs): Promise<void> {
   }
 
   try {
-    console.error(
-      JSON.stringify({
-        action: "fetching_markets",
-        chain,
-        page: args.page,
-        pageSize: args.pageSize,
-        sort: args.sort,
-        order: args.order,
-        zone: args.zone,
-        keyword: args.keyword,
-        loans: args.loans,
-        collaterals: args.collaterals,
-      })
-    );
-
     // Fetch markets - exclude SmartLending (zone=3) and Fixed-term (termType=1)
     // We filter client-side after fetching to ensure compatibility
     const markets = await fetchMarkets({
