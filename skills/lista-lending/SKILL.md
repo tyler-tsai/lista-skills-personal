@@ -4,16 +4,15 @@ version: 0.1.1
 repository: https://github.com/lista-dao/lista-skills
 requires:
   lista-wallet-connect: ">=1.0.0"
+  node: ">=18.0.0"
 description: View and operate Lista Lending vaults/markets. Use when user asks about LENDING-ONLY positions or wants to deposit/withdraw/borrow/repay. For all-product overview, use lista-report instead.
 ---
 
 # Lista Lending Skill (POC)
 
-> **Version:** 0.1.1
-> **Status:** Pre-release (not public, skip registry verification)
-> **Requires:** lista-wallet-connect >= 1.0.0
-> **Verify:** `node dist/cli.js version`
-> **If outdated:** `npm install && npm run build`
+> **Status:** Pre-release (internal only, not in public registry)
+> **Quick check:** `node dist/cli.js version`
+> **Rebuild:** `npm install && npm run build`
 
 Execute Lista Lending vault and market operations through `@lista-dao/moolah-lending-sdk`, with transaction sending delegated to `lista-wallet-connect`.
 
@@ -88,34 +87,39 @@ skills/lista-lending/
 ├── package.json
 ├── tsconfig.json
 └── src/
-    ├── cli.ts
-    ├── api.ts
-    ├── sdk.ts
-    ├── config.ts
-    ├── context.ts
-    ├── executor.ts
+    ├── cli/                # args/help/meta/run
+    ├── api/                # vault/market/user read-side queries
+    ├── sdk/                # SDK client + market runtime prefetch
+    ├── executor/           # tx execution + receipt polling
+    ├── commands/           # command handlers
+    │   ├── shared/         # context/errors/output/tx helpers
+    │   ├── select/
+    │   ├── borrow/
+    │   └── repay/
     ├── presenters/
     ├── utils/
-    └── commands/
-        ├── vaults.ts
-        ├── markets.ts
-        ├── holdings.ts
-        ├── select.ts
-        ├── deposit.ts
-        ├── withdraw.ts
-        ├── supply.ts
-        ├── borrow.ts
-        ├── repay.ts
-        ├── market-withdraw.ts
-        └── config.ts
+    ├── config.ts
+    ├── context.ts
+    ├── api.ts              # API facade export
+    ├── sdk.ts              # SDK facade export
+    ├── executor.ts         # executor facade export
+    └── cli.ts              # CLI entrypoint
 ```
+
+Notes:
+
+- CLI parsing/routing lives in `src/cli/*` and keeps `src/cli.ts` as the single entrypoint.
+- Read-side querying is split by domain in `src/api/*` (`vault`, `market`, `user`).
+- SDK integration is centralized in `src/sdk/client.ts`; market runtime prefetch is in `src/sdk/market-runtime.ts`.
+- `borrow` and `repay` are split into dedicated `simulate` and `execute` modules to keep command files small.
 
 ## Prerequisites
 
 1. Wallet is paired via `lista-wallet-connect` skill.
 2. You have a valid `wallet-topic` and `wallet-address`.
-3. `lista-wallet-connect` is built (`skills/lista-wallet-connect/dist/cli.js` exists).
-4. `lista-lending` is built (`skills/lista-lending/dist/cli.js` exists).
+3. Node.js version is `>= 18.0.0` (recommended `>= 20`).
+4. `lista-wallet-connect` is built (`skills/lista-wallet-connect/dist/cli.js` exists).
+5. `lista-lending` is built (`skills/lista-lending/dist/cli.js` exists).
 
 ## Setup
 
@@ -474,6 +478,7 @@ node dist/cli.js market-withdraw --withdraw-all
 - `call` performs simulation by default before requesting wallet signature.
 - If simulation fails, result is returned as error/reverted and no signing request is sent.
 - If user rejects in wallet, command returns `status: "rejected", reason: "user_rejected"`.
+- For multi-step operations (approve + action), responses include completed step count and failed/pending step.
 
 ## Typical Workflows
 

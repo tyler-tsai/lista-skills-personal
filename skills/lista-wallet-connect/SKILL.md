@@ -2,15 +2,15 @@
 name: lista-wallet-connect
 version: 1.0.0
 repository: https://github.com/lista-dao/lista-skills
+node: ">=18.0.0"
 description: Connect wallets via WalletConnect v2 and execute EVM signing/transaction operations on Ethereum and BSC.
 ---
 
 # Wallet Connect Skill
 
-> **Version:** 1.0.0
-> **Status:** Pre-release (not public, skip registry verification)
-> **Verify:** `node dist/cli.js version`
-> **If outdated:** `npm install && npm run build`
+> **Status:** Pre-release (internal only, not in public registry)
+> **Quick check:** `node dist/cli.js version`
+> **Rebuild:** `npm install && npm run build`
 
 Wallet connection and transaction bridge skill for EVM (`eip155:1`, `eip155:56`).
 
@@ -21,31 +21,31 @@ skills/lista-wallet-connect/
 ├── SKILL.md
 ├── package.json
 ├── tsconfig.json
-├── src/
-│   ├── cli.ts
-│   ├── client.ts
-│   ├── storage.ts
-│   ├── helpers.ts
-│   ├── rpc.ts
-│   └── commands/
-│       ├── pair.ts
-│       ├── auth.ts
-│       ├── sign.ts
-│       ├── sign-typed-data.ts
-│       ├── send-tx.ts
-│       ├── call.ts
-│       ├── balance.ts
-│       ├── health.ts
-│       ├── sessions.ts
-│       └── tokens.ts
-└── references/
-    └── chains.md
+├── references/
+│   └── chains.md
+└── src/
+    ├── cli/                # args/help/meta/router/env
+    ├── commands/           # pair/auth/sign/send/call/...
+    │   └── call/           # parse/simulate/constants
+    ├── client.ts
+    ├── storage.ts
+    ├── helpers.ts
+    ├── rpc.ts
+    ├── types.ts
+    └── cli.ts              # CLI entrypoint
 ```
+
+Notes:
+
+- `src/cli.ts` stays as the entrypoint; argument parsing/help/dispatch are split under `src/cli/*`.
+- Raw call logic is modularized under `src/commands/call/*` (`parse`, `simulate`, constants).
 
 ## Setup
 
 ```bash
 cd skills/lista-wallet-connect
+# ensure Node.js >= 18 (recommended >= 20)
+node -v
 npm install
 npm run build
 ```
@@ -60,7 +60,7 @@ Optional: you can also place env vars in `skills/lista-wallet-connect/.env`.
 
 ## Runtime Contract
 
-- Commands: `node skills/lista-wallet-connect/dist/cli.js <command> ...`
+- Commands (from skill folder): `node dist/cli.js <command> ...`
 - `stdout`: JSON payloads for automation/agent parsing
 - `stderr`: progress/diagnostic logs
 
@@ -177,6 +177,7 @@ Key points:
 - Simulates via `eth_call` before sending by default.
 - On simulation failure, command returns `status: "simulation_failed"` and does not send tx.
 - Use `--no-simulate` only when you intentionally want to bypass simulation.
+- `--value` accepts hex wei (`0x...`) or native decimal string (for example `0.01`).
 
 Examples:
 
