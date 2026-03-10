@@ -1,1 +1,0 @@
-../../.agents/lista-market/SKILL.md

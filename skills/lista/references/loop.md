@@ -1,67 +1,58 @@
----
-name: lista-loop
-description: "Calculates optimal leverage loop strategies and net APY for Lista Lending on BSC. Simulates recursive deposit-borrow-redeposit loops using current market rates and LLTV to show effective leverage, net APY, and liquidation risk at each loop count. Use when asked about looping strategy, leverage, amplified yield, or how many times to loop a collateral asset."
----
+> Follow the FORMAT ENFORCEMENT rules from SKILL.md. Output must match templates character-for-character.
 
-# Lista Lending — Loop Strategy Calculator
+# Report F — Loop Strategy
 
 Simulate a leverage loop strategy: deposit collateral → borrow → re-deposit → repeat.
 
-**Input:** `<collateral_asset> <borrow_asset> <initial_amount> [target_loops]`
-**API base:** `https://api.lista.org/api/moolah`
+**Input:** The user must provide `<collateral_asset> <borrow_asset> <initial_amount> [target_loops]`.
 
----
+If not already provided, ask:
 
-## BEFORE ANYTHING ELSE — Ask for language
+> **EN:** What collateral asset, borrow asset, and initial amount? (e.g. slisBNB WBNB 10)
+> **中文：** 請提供抵押品、借款資產和初始數量（例如 slisBNB WBNB 10）
 
-Do NOT run any commands until the user has answered this question:
+## F.1 — Find the relevant market
 
-> Which language should I use for the output?
-> 請問輸出以哪種語言生成？
->   1) English
->   2) 简体中文
->   3) 繁體中文
->   4) Other (specify)
+The `keyword` parameter of `lista_get_borrow_markets` filters by **loan token name**,
+not collateral name. Search by the borrow asset, then filter by collateral:
 
-**Language handling rules:**
-- **1 / English** — use the English format template exactly.
-- **2 / 简体中文** — use the 繁體中文 format template, then convert all Traditional Chinese characters to Simplified Chinese. Do NOT alter any numbers, symbols, separators, or field layout.
-- **3 / 繁體中文** — use the 繁體中文 format template exactly.
-- **4 / Other** — translate all label text into the requested language. Keep every separator line, number format, and indentation identical to the English template. Do NOT add bullet points or reformat rows.
-
-Remember the answer and use it for all output generated below.
-
----
-
-## Step 1 — Find the relevant market
-
-```bash
-curl -s "https://api.lista.org/api/moolah/vault/list?pageSize=100"
+```
+lista_get_borrow_markets({ keyword: "<borrow_asset>", pageSize: 50 })
 ```
 
-Filter vaults where `assetSymbol == <borrow_asset>`. For each, fetch allocations (`response.data.list`):
+From the returned list, find the entry where `collateral == <collateral_asset>`. Collect:
+- `rate` — borrow APY (decimal)
+- `lltv` — liquidation LTV (decimal, e.g. "0.860000000000000000") — already in the response, no separate RPC call needed
+- `id` — market identifier
+- `collateralToken` — collateral token contract address
+- `loanToken` — loan token contract address
 
-```bash
-curl -s "https://api.lista.org/api/moolah/vault/allocation?address=<VAULT>&pageSize=100"
+If no matching market is found, paginate (`page: 2`, `page: 3`) or drop the keyword
+filter and scan all markets. Inform the user if the market still cannot be found.
+
+## F.2 — Fetch token prices
+
+Use the **Token price resolution** section in `domain.md` to get collateral and loan prices.
+
+## F.3 — Get collateral native yield
+
+For slisBNB, ankrBNB, wstBNB, BNBx:
+
+```
+lista_get_staking_info()
 ```
 
-Find the allocation where `collateralSymbol == <collateral_asset>`. Collect `borrowRate` and `id`. Then get LLTV from the market API:
+Use the returned staking APR/APY as native yield.
 
-```bash
-curl -s "https://api.lista.org/api/moolah/market/<MARKET_ID>"
-```
-
-## Step 2 — Get collateral native yield
-
-- slisBNB, ankrBNB, BNBx: ~4–5% staking APY (check latest from Lista staking or CoinGecko)
+For other assets:
 - PT tokens: use fixed rate from `terms.apy` in market response
 - BTCB, stablecoins: 0% native yield
 
-## Step 3 — Simulate loops
+## F.4 — Simulate loops
 
 Variables:
 - `P_c` = collateral price (USD), `P_b` = borrow price (USD)
-- `r` = `borrowRate` (annual), `y` = native yield (annual)
+- `r` = `rate` (annual), `y` = native yield (annual)
 - `L` = LLTV, `targetLTV` = 0.70 (conservative default)
 
 ```
@@ -89,18 +80,11 @@ buffer      = (P_c − liqPrice) / P_c × 100%
 
 Recommend the loop count that maximises net APY while keeping buffer ≥ 20%.
 
----
+## F.5 — Output template
 
-## Step 4 — Generate output
+⛔ STOP BEFORE OUTPUTTING. You MUST copy the template below character-for-character. Substitute `<placeholder>` values with real data. Change NOTHING else — no bullet points, no overview section, no preamble, no trailing remarks. Your response must start with the exact first line shown in the template.
 
-**STRICT FORMAT RULES — follow exactly, no exceptions:**
-- Copy the template below character-for-character, including separator lines (━━━, ────, │).
-- Use the exact column headers shown. Do NOT rename, reorder, or omit any column.
-- Use `- - - - -` between the table and the recommendation block.
-- Plain text only — no markdown bold/italics. Intended for Telegram/Discord paste.
-- Note: In the templates below, ＄ represents $. Use the regular $ in actual output.
-
-### English format
+### English
 
 ```
 Lista Lending — Loop Strategy: slisBNB/WBNB
@@ -125,10 +109,10 @@ Loops │ Collateral      │ Debt          │ Leverage │ Net APY │ Liq Pri
 ⚠️  Risk: Borrow rate is variable. If it rises above ~5.8%, strategy turns net negative.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-Data: api.lista.org  |  BSC Mainnet
+Data: <DATA_SOURCE>  |  <NETWORK>
 ```
 
-### 繁體中文格式
+### 繁體中文
 
 ```
 Lista Lending — 槓桿策略：slisBNB/WBNB
@@ -153,5 +137,5 @@ LLTV：86%  |  借款利率：2.6% APY  |  slisBNB 原生收益：4.2%
 ⚠️  風險：借款利率為浮動利率。若利率上升至約 5.8% 以上，策略將轉為淨虧損。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-資料來源：api.lista.org  |  BSC 主網
+資料來源：<DATA_SOURCE>  |  <NETWORK>
 ```

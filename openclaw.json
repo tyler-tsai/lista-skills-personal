@@ -1,25 +1,13 @@
 {
   "name": "@lista-dao/lending-skills",
-  "version": "1.2.0",
-  "description": "LLM-agnostic agent skills for Lista Lending — daily DeFi workflows on BSC",
-  "agentsDir": ".agents",
-  "skillsDir": ".agents",
+  "version": "2.0.0",
+  "description": "LLM-agnostic agent skills for Lista Lending — position monitoring, yield analysis, and risk alerts on BSC",
+  "agentsDir": "skills",
+  "skillsDir": "skills",
   "skills": [
     {
-      "command": "lista-report",
-      "description": "Generate a bilingual (EN/中文) position report across one or more wallet addresses on Moolah, with strategy recommendations"
-    },
-    {
-      "command": "lista-yield",
-      "description": "Scan best yield opportunities across all Lista Lending vaults"
-    },
-    {
-      "command": "lista-loop",
-      "description": "Calculate optimal leverage loop strategy & net APY for a given asset"
-    },
-    {
-      "command": "lista-market",
-      "description": "Daily protocol digest: total TVL, utilization, top vaults, high-rate markets"
+      "command": "lista",
+      "description": "Lista Lending assistant — position report, market overview, yield scan, risk check, daily digest, loop strategy"
     }
   ]
 }

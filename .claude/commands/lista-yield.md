@@ -1,1 +1,0 @@
-../../.agents/lista-yield/SKILL.md
