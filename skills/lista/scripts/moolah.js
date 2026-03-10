@@ -485,8 +485,11 @@ for (let i = 0; i < rawArgs.length; i++) {
   }
 }
 
-if (!['bsc', 'eth'].includes(chainKey)) {
-  process.stderr.write(`Unknown chain "${chainKey}". Valid: bsc, eth\n`);
+// Normalise alias
+if (chainKey === 'eth') chainKey = 'ethereum';
+
+if (!['bsc', 'ethereum'].includes(chainKey)) {
+  process.stderr.write(`Unknown chain "${chainKey}". Valid: bsc, ethereum (or eth)\n`);
   process.exit(1);
 }
 
