@@ -7,6 +7,7 @@ import {
   isValidAddress,
   isValidMarketId,
 } from "../../utils/validators.js";
+import { inferLatestTopicByAddress } from "./wallet-session.js";
 
 const DEFAULT_CHAIN = "eip155:56";
 
@@ -105,8 +106,21 @@ export function resolveVaultContext(
 ): ResolvedVaultContext {
   const vaultAddressInput = args.vault || ctx.selectedVault?.address;
   const chain = args.chain || ctx.selectedVault?.chain || DEFAULT_CHAIN;
-  const walletTopicInput = args.walletTopic || ctx.walletTopic;
+  let walletTopicInput = args.walletTopic || null;
   const walletAddressInput = args.walletAddress || ctx.userAddress;
+
+  if (args.walletAddress && !args.walletTopic) {
+    const inferredTopic = inferLatestTopicByAddress(args.walletAddress);
+    if (inferredTopic) {
+      walletTopicInput = inferredTopic;
+    } else if (options.requireWalletTopic !== false) {
+      throw new InputValidationError(
+        `No wallet session found for ${args.walletAddress}. Provide --wallet-topic or reconnect this wallet`
+      );
+    }
+  } else if (!walletTopicInput) {
+    walletTopicInput = ctx.walletTopic || null;
+  }
 
   const vaultAddress = requireAddress(
     vaultAddressInput,
@@ -140,8 +154,21 @@ export function resolveMarketContext(
 ): ResolvedMarketContext {
   const marketIdInput = args.market || ctx.selectedMarket?.marketId;
   const chain = args.chain || ctx.selectedMarket?.chain || DEFAULT_CHAIN;
-  const walletTopicInput = args.walletTopic || ctx.walletTopic;
+  let walletTopicInput = args.walletTopic || null;
   const walletAddressInput = args.walletAddress || ctx.userAddress;
+
+  if (args.walletAddress && !args.walletTopic) {
+    const inferredTopic = inferLatestTopicByAddress(args.walletAddress);
+    if (inferredTopic) {
+      walletTopicInput = inferredTopic;
+    } else if (options.requireWalletTopic !== false) {
+      throw new InputValidationError(
+        `No wallet session found for ${args.walletAddress}. Provide --wallet-topic or reconnect this wallet`
+      );
+    }
+  } else if (!walletTopicInput) {
+    walletTopicInput = ctx.walletTopic || null;
+  }
 
   const validMarketId = requireMarketId(marketIdInput);
   const walletAddress = requireAddress(
