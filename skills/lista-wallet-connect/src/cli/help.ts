@@ -3,7 +3,7 @@ import type { CliMeta } from "./meta.js";
 export function renderHelp(meta: CliMeta): string {
   return `${meta.skillName} v${meta.skillVersion}
 
-Usage: dist/cli.js <command> [options]
+Usage: dist/cli/cli.bundle.mjs <command> [options]
 
 Commands:
   pair             Create pairing session (--chains eip155:56,eip155:1)

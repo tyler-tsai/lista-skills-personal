@@ -11,7 +11,7 @@ description: View and operate Lista Lending vaults/markets. Use when user asks a
 # Lista Lending Skill (POC)
 
 > **Status:** Pre-release (internal only, not in public registry)
-> **Agent quick check:** `node dist/cli.js version`
+> **Agent quick check:** `node dist/cli/cli.bundle.mjs version`
 > **Agent rebuild:** `npm install && npm run build`
 
 Execute Lista Lending vault and market operations through `@lista-dao/moolah-lending-sdk`, with transaction sending delegated to `lista-wallet-connect`.
@@ -140,8 +140,8 @@ Notes:
 1. Wallet is paired via `lista-wallet-connect` skill.
 2. You have a valid `wallet-topic` and `wallet-address`.
 3. Node.js version is `>= 18.0.0` (recommended `>= 20`).
-4. `lista-wallet-connect` is built (`skills/lista-wallet-connect/dist/cli.js` exists).
-5. `lista-lending` is built (`skills/lista-lending/dist/cli.js` exists).
+4. `lista-wallet-connect` is built (`skills/lista-wallet-connect/dist/cli/cli.bundle.mjs` exists).
+5. `lista-lending` is built (`skills/lista-lending/dist/cli/cli.bundle.mjs` exists).
 
 ## Setup (Agent-Run)
 
@@ -151,7 +151,7 @@ Use prebuilt `dist/` by default for faster startup.
 cd skills/lista-lending
 # ensure Node.js >= 18 (recommended >= 20)
 node -v
-node dist/cli.js version
+node dist/cli/cli.bundle.mjs version
 ```
 
 Only run install/build when `dist/` is missing or version check fails:
@@ -160,10 +160,18 @@ Only run install/build when `dist/` is missing or version check fails:
 cd skills/lista-lending
 npm install
 npm run build
+node dist/cli/cli.bundle.mjs version
+```
+
+Fallback for local debugging (non-bundled output):
+
+```bash
+cd skills/lista-lending
+npm run build
 node dist/cli.js version
 ```
 
-If `skills/lista-wallet-connect/dist/cli.js` is missing, rebuild wallet-connect as well:
+If `skills/lista-wallet-connect/dist/cli/cli.bundle.mjs` is missing, rebuild wallet-connect as well:
 
 ```bash
 cd skills/lista-wallet-connect
@@ -175,7 +183,7 @@ Agent execution path:
 
 ```bash
 cd skills/lista-lending
-node dist/cli.js <command> [options]
+node dist/cli/cli.bundle.mjs <command> [options]
 ```
 
 ## Output Contract
@@ -259,7 +267,7 @@ All command snippets below are for agent execution; do not instruct the user to 
 Purpose: Print skill version and dependency constraints.
 
 ```bash
-node dist/cli.js version
+node dist/cli/cli.bundle.mjs version
 ```
 
 ### 2) `config`
@@ -270,13 +278,13 @@ Examples:
 
 ```bash
 # show config
-node dist/cli.js config --show
+node dist/cli/cli.bundle.mjs config --show
 
 # set rpc override
-node dist/cli.js config --set-rpc --chain eip155:56 --url https://bsc-mainnet.nodereal.io/v1/<key>
+node dist/cli/cli.bundle.mjs config --set-rpc --chain eip155:56 --url https://bsc-mainnet.nodereal.io/v1/<key>
 
 # clear rpc override
-node dist/cli.js config --clear-rpc --chain eip155:56
+node dist/cli/cli.bundle.mjs config --clear-rpc --chain eip155:56
 
 ```
 
@@ -298,10 +306,10 @@ Common options:
 Examples:
 
 ```bash
-node dist/cli.js vaults
-node dist/cli.js vaults --chain eip155:1
-node dist/cli.js vaults --sort apy --order desc --page 1 --page-size 10
-node dist/cli.js vaults --assets 0x8d0d...,0x55d3... --curators "Lista DAO,Pangolins"
+node dist/cli/cli.bundle.mjs vaults
+node dist/cli/cli.bundle.mjs vaults --chain eip155:1
+node dist/cli/cli.bundle.mjs vaults --sort apy --order desc --page 1 --page-size 10
+node dist/cli/cli.bundle.mjs vaults --assets 0x8d0d...,0x55d3... --curators "Lista DAO,Pangolins"
 ```
 
 ### 4) `markets`
@@ -317,9 +325,9 @@ Common options:
 Examples:
 
 ```bash
-node dist/cli.js markets
-node dist/cli.js markets --chain eip155:56 --sort liquidity --order desc --page-size 20
-node dist/cli.js markets --loans USD1,USDT --collaterals USD1,BTCB
+node dist/cli/cli.bundle.mjs markets
+node dist/cli/cli.bundle.mjs markets --chain eip155:56 --sort liquidity --order desc --page-size 20
+node dist/cli/cli.bundle.mjs markets --loans USD1,USDT --collaterals USD1,BTCB
 ```
 
 Notes:
@@ -341,16 +349,16 @@ Examples:
 
 ```bash
 # all positions (vault + market)
-node dist/cli.js holdings --address 0xYOUR_ADDRESS
+node dist/cli/cli.bundle.mjs holdings --address 0xYOUR_ADDRESS
 
 # only vault positions
-node dist/cli.js holdings --address 0xYOUR_ADDRESS --scope vault
+node dist/cli/cli.bundle.mjs holdings --address 0xYOUR_ADDRESS --scope vault
 
 # only market positions
-node dist/cli.js holdings --address 0xYOUR_ADDRESS --scope market
+node dist/cli/cli.bundle.mjs holdings --address 0xYOUR_ADDRESS --scope market
 
 # only currently selected position
-node dist/cli.js holdings --scope selected
+node dist/cli/cli.bundle.mjs holdings --scope selected
 ```
 
 Market position fields include:
@@ -377,22 +385,22 @@ Examples:
 
 ```bash
 # select vault
-node dist/cli.js select \
+node dist/cli/cli.bundle.mjs select \
   --vault 0xfa27f172e0b6ebcef9c51abf817e2cb142fbe627 \
   --chain eip155:56 \
   --wallet-topic <topic> \
   --wallet-address 0xYOUR_ADDRESS
 
 # select market
-node dist/cli.js select \
+node dist/cli/cli.bundle.mjs select \
   --market 0xd384584abf6504425c9873f34a63372625d46cd1f2e79aeedc77475cacaca922 \
   --chain eip155:56 \
   --wallet-topic <topic> \
   --wallet-address 0xYOUR_ADDRESS
 
 # show/clear
-node dist/cli.js select --show
-node dist/cli.js select --clear
+node dist/cli/cli.bundle.mjs select --show
+node dist/cli/cli.bundle.mjs select --clear
 ```
 
 Notes:
@@ -413,10 +421,10 @@ Example:
 
 ```bash
 # using selected vault
-node dist/cli.js deposit --amount 1
+node dist/cli/cli.bundle.mjs deposit --amount 1
 
 # explicit target
-node dist/cli.js deposit \
+node dist/cli/cli.bundle.mjs deposit \
   --vault 0xVAULT \
   --amount 1 \
   --chain eip155:56 \
@@ -435,8 +443,8 @@ Required:
 Examples:
 
 ```bash
-node dist/cli.js withdraw --amount 0.5
-node dist/cli.js withdraw --withdraw-all
+node dist/cli/cli.bundle.mjs withdraw --amount 0.5
+node dist/cli/cli.bundle.mjs withdraw --withdraw-all
 ```
 
 ### 9) `supply`
@@ -451,7 +459,7 @@ Required:
 Example:
 
 ```bash
-node dist/cli.js supply --amount 2
+node dist/cli/cli.bundle.mjs supply --amount 2
 ```
 
 ### 10) `borrow`
@@ -468,13 +476,13 @@ Examples:
 
 ```bash
 # check max borrowable
-node dist/cli.js borrow --simulate
+node dist/cli/cli.bundle.mjs borrow --simulate
 
 # check max after hypothetical supply
-node dist/cli.js borrow --simulate --simulate-supply 2
+node dist/cli/cli.bundle.mjs borrow --simulate --simulate-supply 2
 
 # execute borrow
-node dist/cli.js borrow --amount 0.01
+node dist/cli/cli.bundle.mjs borrow --amount 0.01
 ```
 
 ### 11) `repay`
@@ -491,14 +499,14 @@ Examples:
 
 ```bash
 # simulate partial repay impact
-node dist/cli.js repay --simulate --amount 0.01
+node dist/cli/cli.bundle.mjs repay --simulate --amount 0.01
 
 # simulate full repay impact
-node dist/cli.js repay --simulate --repay-all
+node dist/cli/cli.bundle.mjs repay --simulate --repay-all
 
 # execute
-node dist/cli.js repay --amount 0.01
-node dist/cli.js repay --repay-all
+node dist/cli/cli.bundle.mjs repay --amount 0.01
+node dist/cli/cli.bundle.mjs repay --repay-all
 ```
 
 ### 12) `market-withdraw`
@@ -512,8 +520,8 @@ Required:
 Examples:
 
 ```bash
-node dist/cli.js market-withdraw --amount 0.5
-node dist/cli.js market-withdraw --withdraw-all
+node dist/cli/cli.bundle.mjs market-withdraw --amount 0.5
+node dist/cli/cli.bundle.mjs market-withdraw --withdraw-all
 ```
 
 ## Transaction Behavior
@@ -530,32 +538,32 @@ node dist/cli.js market-withdraw --withdraw-all
 
 ```bash
 # 1) discover
-node dist/cli.js vaults --chain eip155:56
+node dist/cli/cli.bundle.mjs vaults --chain eip155:56
 
 # 2) select
-node dist/cli.js select --vault 0xVAULT --wallet-topic <topic> --wallet-address 0xADDR
+node dist/cli/cli.bundle.mjs select --vault 0xVAULT --wallet-topic <topic> --wallet-address 0xADDR
 
 # 3) operate
-node dist/cli.js deposit --amount 1
-node dist/cli.js withdraw --amount 0.5
+node dist/cli/cli.bundle.mjs deposit --amount 1
+node dist/cli/cli.bundle.mjs withdraw --amount 0.5
 ```
 
 ### Market flow
 
 ```bash
 # 1) discover
-node dist/cli.js markets --chain eip155:56
+node dist/cli/cli.bundle.mjs markets --chain eip155:56
 
 # 2) select
-node dist/cli.js select --market 0xMARKET --wallet-topic <topic> --wallet-address 0xADDR
+node dist/cli/cli.bundle.mjs select --market 0xMARKET --wallet-topic <topic> --wallet-address 0xADDR
 
 # 3) operate
-node dist/cli.js supply --amount 2
-node dist/cli.js borrow --simulate
-node dist/cli.js borrow --amount 0.01
-node dist/cli.js repay --simulate --amount 0.01
-node dist/cli.js repay --amount 0.01
-node dist/cli.js market-withdraw --amount 1
+node dist/cli/cli.bundle.mjs supply --amount 2
+node dist/cli/cli.bundle.mjs borrow --simulate
+node dist/cli/cli.bundle.mjs borrow --amount 0.01
+node dist/cli/cli.bundle.mjs repay --simulate --amount 0.01
+node dist/cli/cli.bundle.mjs repay --amount 0.01
+node dist/cli/cli.bundle.mjs market-withdraw --amount 1
 ```
 
 ## Security Checklist

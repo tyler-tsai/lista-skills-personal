@@ -5,7 +5,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const WALLET_CONNECT_CLI = resolve(
   __dirname,
-  "../../../lista-wallet-connect/dist/cli.js"
+  "../../../lista-wallet-connect/dist/cli/cli.bundle.mjs"
 );
 
 const EXPLORER_URLS: Record<string, string> = {

@@ -8,10 +8,6 @@ import { execSync } from "child_process";
 import { parseAccountId, parseChainId } from "@walletconnect/utils";
 import { getClient } from "../client.js";
 import { saveSession, SESSIONS_DIR } from "../storage.js";
-const PAIR_HEARTBEAT_MS = 10000;
-function shouldEmitStdoutHeartbeat() {
-    return !process.stdout.isTTY || process.env.WC_STDOUT_HEARTBEAT === "1";
-}
 /**
  * Detect if running in a terminal environment where we should auto-open QR.
  * Returns true for: direct terminal, SSH, VSCode integrated terminal
@@ -52,6 +48,13 @@ function openFile(filePath) {
     catch {
         return false;
     }
+}
+function buildQrOpenCommands(qrPath) {
+    return {
+        macos: `open "${qrPath}"`,
+        linux: `xdg-open "${qrPath}"`,
+        windows: `start "" "${qrPath}"`,
+    };
 }
 const NAMESPACE_CONFIG = {
     eip155: {
@@ -126,6 +129,9 @@ export async function cmdPair(args) {
     const qrPath = join(SESSIONS_DIR, `qr-${Date.now()}.png`);
     mkdirSync(SESSIONS_DIR, { recursive: true });
     await QRCode.toFile(qrPath, uri, { width: 400, margin: 2 });
+    const qrMarkdown = `![WalletConnect QR](${qrPath})`;
+    const qrOpenCommands = buildQrOpenCommands(qrPath);
+    const openclawMediaDirective = `MEDIA:${qrPath}`;
     const autoOpen = shouldAutoOpenQR(args.open);
     let openedBySystem = false;
     // Auto-open QR in terminal environments
@@ -134,39 +140,46 @@ export async function cmdPair(args) {
     }
     // Build output for agent/CLI environments.
     const output = {
-        uri,
-        qrPath,
-        qrMarkdown: `![WalletConnect QR](${qrPath})`,
         status: "waiting_for_approval",
         interactionRequired: true,
         userReminder: "Wallet pairing is waiting for your confirmation. Please open your wallet app and approve or reject the request.",
         message: "Scan and approve this WalletConnect request in your wallet app.",
-        deliveryHint: "Send qrPath as image attachment. If image delivery fails, share uri as plain text.",
+        qrPath,
+        qrMarkdown,
+        uri,
+        deliveryPlan: {
+            preferred: ["image_attachment", "markdown_image"],
+            fallback: "wc_uri",
+            fallbackWhen: [
+                "image_not_supported",
+                "image_render_failed",
+                "image_delivery_failed",
+            ],
+            image: {
+                qrPath,
+                qrMarkdown,
+                qrOpenCommands,
+            },
+            wcUri: {
+                uri,
+            },
+        },
+        deliveryHint: "Primary delivery is QR image (qrPath/qrMarkdown). Use wc URI only when image rendering or image delivery is not supported.",
+        openclaw: {
+            mediaDirective: openclawMediaDirective,
+            fallbackUri: uri,
+            rule: "For OpenClaw channel delivery, emit mediaDirective as a standalone line first. Only use fallbackUri when media delivery is unsupported or fails.",
+        },
     };
     if (!autoOpen || !openedBySystem) {
         output.note =
-            "If image preview is unavailable, open qrPath manually (macOS: open <qrPath>, Linux: xdg-open <qrPath>, Windows: start <qrPath>) or use the wc: uri directly in your wallet app.";
+            "If QR image preview is unavailable, try opening qrPath with a system image viewer first. Use the wc URI only if image rendering/delivery is not supported.";
+        output.qrOpenCommands = qrOpenCommands;
     }
     if (autoOpen && !openedBySystem) {
         output.openFailed = true;
     }
     console.log(JSON.stringify(output));
-    const emitStdoutHeartbeat = shouldEmitStdoutHeartbeat();
-    const waitingStartedAt = Date.now();
-    const heartbeatTimer = setInterval(() => {
-        const heartbeat = {
-            status: "waiting_for_approval",
-            phase: "pair",
-            elapsedMs: Date.now() - waitingStartedAt,
-            interactionRequired: true,
-            userReminder: "Wallet pairing is waiting for your confirmation. Please open your wallet app and approve or reject the request.",
-            message: "Waiting for wallet approval.",
-        };
-        console.error(JSON.stringify(heartbeat));
-        if (emitStdoutHeartbeat) {
-            console.log(JSON.stringify(heartbeat));
-        }
-    }, PAIR_HEARTBEAT_MS);
     try {
         const session = await approval();
         const accounts = Object.values(session.namespaces).flatMap((ns) => ns.accounts || []);
@@ -200,9 +213,6 @@ export async function cmdPair(args) {
     }
     catch (err) {
         console.log(JSON.stringify({ status: "rejected", error: err.message }));
-    }
-    finally {
-        clearInterval(heartbeatTimer);
     }
     await client.core.relayer.transportClose().catch(() => { });
     process.exit(0);

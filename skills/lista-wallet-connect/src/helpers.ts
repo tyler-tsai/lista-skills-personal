@@ -93,19 +93,17 @@ export async function resolveAddress(addressOrEns: string): Promise<string> {
 }
 
 /**
- * Wrap client.request with timeout and periodic polling status on stderr.
+ * Wrap client.request with timeout and emit a single waiting status event.
  */
 export async function requestWithTimeout(
   client: InstanceType<typeof SignClient>,
   requestParams: Parameters<InstanceType<typeof SignClient>["request"]>[0],
   {
-    pollIntervalMs = 10000,
     timeoutMs = 300000,
     phase = "wallet_request",
     context,
     emitStdoutHeartbeat,
   }: {
-    pollIntervalMs?: number;
     timeoutMs?: number;
     phase?: string;
     context?: Record<string, unknown>;
@@ -137,22 +135,13 @@ export async function requestWithTimeout(
 
   emitHeartbeat();
 
-  const pollTimer = setInterval(() => {
-    emitHeartbeat();
-  }, pollIntervalMs);
-
-  try {
-    const result = await Promise.race([
-      client.request(requestParams),
-      new Promise((_, reject) => {
-        setTimeout(
-          () => reject(new Error("Request timed out after 5 minutes -- user did not respond")),
-          timeoutMs,
-        );
-      }),
-    ]);
-    return result;
-  } finally {
-    clearInterval(pollTimer);
-  }
+  return Promise.race([
+    client.request(requestParams),
+    new Promise((_, reject) => {
+      setTimeout(
+        () => reject(new Error("Request timed out after 5 minutes -- user did not respond")),
+        timeoutMs,
+      );
+    }),
+  ]);
 }

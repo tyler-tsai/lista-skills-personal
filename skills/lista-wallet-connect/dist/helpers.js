@@ -85,9 +85,9 @@ export async function resolveAddress(addressOrEns) {
     return resolved;
 }
 /**
- * Wrap client.request with timeout and periodic polling status on stderr.
+ * Wrap client.request with timeout and emit a single waiting status event.
  */
-export async function requestWithTimeout(client, requestParams, { pollIntervalMs = 10000, timeoutMs = 300000, phase = "wallet_request", context, emitStdoutHeartbeat, } = {}) {
+export async function requestWithTimeout(client, requestParams, { timeoutMs = 300000, phase = "wallet_request", context, emitStdoutHeartbeat, } = {}) {
     const start = Date.now();
     const shouldEmitStdout = emitStdoutHeartbeat ?? (!process.stdout.isTTY || process.env.WC_STDOUT_HEARTBEAT === "1");
     const userReminder = "Wallet confirmation is pending. Please open your wallet app and approve or reject the request to continue.";
@@ -108,19 +108,10 @@ export async function requestWithTimeout(client, requestParams, { pollIntervalMs
         }
     };
     emitHeartbeat();
-    const pollTimer = setInterval(() => {
-        emitHeartbeat();
-    }, pollIntervalMs);
-    try {
-        const result = await Promise.race([
-            client.request(requestParams),
-            new Promise((_, reject) => {
-                setTimeout(() => reject(new Error("Request timed out after 5 minutes -- user did not respond")), timeoutMs);
-            }),
-        ]);
-        return result;
-    }
-    finally {
-        clearInterval(pollTimer);
-    }
+    return Promise.race([
+        client.request(requestParams),
+        new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("Request timed out after 5 minutes -- user did not respond")), timeoutMs);
+        }),
+    ]);
 }

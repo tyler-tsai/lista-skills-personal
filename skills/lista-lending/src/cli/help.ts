@@ -3,7 +3,7 @@ import type { CliMeta } from "./meta.js";
 export function renderHelp(meta: CliMeta): string {
   return `${meta.skillName} v${meta.skillVersion}
 
-Usage: dist/cli.js <command> [options]
+Usage: dist/cli/cli.bundle.mjs <command> [options]
 
 Vault Commands:
   vaults           List available vaults
@@ -24,32 +24,32 @@ Common Commands:
   version          Show version information
 
 Discovery:
-  node dist/cli.js vaults [--chain eip155:56]
-  node dist/cli.js markets [--chain eip155:56]
-  node dist/cli.js holdings --address 0x...
+  node dist/cli/cli.bundle.mjs vaults [--chain eip155:56]
+  node dist/cli/cli.bundle.mjs markets [--chain eip155:56]
+  node dist/cli/cli.bundle.mjs holdings --address 0x...
 
 Selection:
-  node dist/cli.js select --vault 0x... --wallet-topic <t> --wallet-address 0x...
-  node dist/cli.js select --market 0x... --wallet-topic <t> --wallet-address 0x...
-  node dist/cli.js select --show
-  node dist/cli.js select --clear
+  node dist/cli/cli.bundle.mjs select --vault 0x... --wallet-topic <t> --wallet-address 0x...
+  node dist/cli/cli.bundle.mjs select --market 0x... --wallet-topic <t> --wallet-address 0x...
+  node dist/cli/cli.bundle.mjs select --show
+  node dist/cli/cli.bundle.mjs select --clear
 
 Vault Operations:
-  node dist/cli.js deposit --amount 100
-  node dist/cli.js withdraw --amount 50
-  node dist/cli.js withdraw --withdraw-all
+  node dist/cli/cli.bundle.mjs deposit --amount 100
+  node dist/cli/cli.bundle.mjs withdraw --amount 50
+  node dist/cli/cli.bundle.mjs withdraw --withdraw-all
 
 Market Operations:
-  node dist/cli.js supply --amount 1
-  node dist/cli.js borrow --simulate
-  node dist/cli.js borrow --simulate --simulate-supply 1
-  node dist/cli.js borrow --amount 100
-  node dist/cli.js repay --simulate --amount 50
-  node dist/cli.js repay --simulate --repay-all
-  node dist/cli.js repay --amount 50
-  node dist/cli.js repay --repay-all
-  node dist/cli.js market-withdraw --amount 0.5
-  node dist/cli.js market-withdraw --withdraw-all
+  node dist/cli/cli.bundle.mjs supply --amount 1
+  node dist/cli/cli.bundle.mjs borrow --simulate
+  node dist/cli/cli.bundle.mjs borrow --simulate --simulate-supply 1
+  node dist/cli/cli.bundle.mjs borrow --amount 100
+  node dist/cli/cli.bundle.mjs repay --simulate --amount 50
+  node dist/cli/cli.bundle.mjs repay --simulate --repay-all
+  node dist/cli/cli.bundle.mjs repay --amount 50
+  node dist/cli/cli.bundle.mjs repay --repay-all
+  node dist/cli/cli.bundle.mjs market-withdraw --amount 0.5
+  node dist/cli/cli.bundle.mjs market-withdraw --withdraw-all
 
 Options:
   --vault <address>          Vault contract address

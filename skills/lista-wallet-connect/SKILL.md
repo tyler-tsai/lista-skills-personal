@@ -9,7 +9,7 @@ description: Connect wallets via WalletConnect v2 and execute EVM signing/transa
 # Wallet Connect Skill
 
 > **Status:** Pre-release (internal only, not in public registry)
-> **Agent quick check:** `node dist/cli.js version`
+> **Agent quick check:** `node dist/cli/cli.bundle.mjs version`
 > **Agent rebuild:** `npm install && npm run build`
 
 Wallet connection and transaction bridge skill for EVM (`eip155:1`, `eip155:56`).
@@ -56,7 +56,7 @@ Use prebuilt `dist/` by default for faster startup.
 cd skills/lista-wallet-connect
 # ensure Node.js >= 18 (recommended >= 20)
 node -v
-node dist/cli.js version
+node dist/cli/cli.bundle.mjs version
 ```
 
 Only run install/build when `dist/` is missing or version check fails:
@@ -65,7 +65,7 @@ Only run install/build when `dist/` is missing or version check fails:
 cd skills/lista-wallet-connect
 npm install
 npm run build
-node dist/cli.js version
+node dist/cli/cli.bundle.mjs version
 ```
 
 Set WalletConnect project id:
@@ -79,10 +79,10 @@ You can override it by exporting `WALLETCONNECT_PROJECT_ID` in your shell.
 
 ## Runtime Contract
 
-- Agent execution entrypoint: `node dist/cli.js <command> ...`
+- Agent execution entrypoint: `node dist/cli/cli.bundle.mjs <command> ...`
 - `stdout`: JSON payloads for automation/agent parsing
 - `stderr`: progress/diagnostic logs
-- In non-TTY agent environments, wallet-request commands also emit periodic `waiting_for_approval` JSON heartbeat events on `stdout` until a final result is returned.
+- Wallet-request commands emit one `waiting_for_approval` event first, then a terminal status (`paired`/`authenticated`/`signed`/`sent`/`rejected`/`simulation_failed`/`error`).
 - Treat raw JSON payloads as internal contract data; only show raw output to users on explicit request.
 
 ### OpenClaw Streaming Rules (Required)
@@ -92,7 +92,11 @@ You can override it by exporting `WALLETCONNECT_PROJECT_ID` in your shell.
 - Continue consuming output until a terminal status is received.
 - Terminal statuses: `paired`, `authenticated`, `signed`, `sent`, `rejected`, `simulation_failed`, `error`.
 - If no terminal status arrives before process timeout, return timeout as an operational error and prompt retry.
-- For `pair`, use `qrPath` as image attachment (or `qrMarkdown` if renderer supports it). If image rendering fails, send the `uri` text fallback.
+- For `pair`, always try image delivery first (`qrPath` attachment, then `qrMarkdown` if supported).
+- Only send `uri` (`wc:`) when image rendering/delivery is unsupported or fails.
+- Read `deliveryPlan` in the waiting payload as the source of truth for this fallback order.
+- For OpenClaw channels, if `openclaw.mediaDirective` exists, emit that `MEDIA:<path>` line as the image-send directive.
+- If OpenClaw media send fails, retry with `openclaw.fallbackUri` (`wc:` URI) as text.
 - When a waiting event contains `interactionRequired: true`, show a user reminder immediately (once per request) using `userReminder` text, e.g. "Please approve/reject in your wallet app."
 
 ## Supported Chains
@@ -134,13 +138,13 @@ All command snippets below are for agent execution; do not instruct the user to 
 Purpose: Start WalletConnect pairing flow.
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js pair --chains eip155:56
-node skills/lista-wallet-connect/dist/cli.js pair --chains eip155:56,eip155:1
-node skills/lista-wallet-connect/dist/cli.js pair --chains eip155:56 --open
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs pair --chains eip155:56
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs pair --chains eip155:56,eip155:1
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs pair --chains eip155:56 --open
 ```
 
 Behavior:
-- First outputs `status: "waiting_for_approval"` with `uri`, `qrPath`, `qrMarkdown`, plus a guidance message.
+- First outputs `status: "waiting_for_approval"` with `uri`, `qrPath`, `qrMarkdown`, `deliveryPlan`, `openclaw`, plus guidance fields.
 - After user approves, outputs `status: "paired"` with `message`, `topic`, `accounts`, `peerName`, `pairedAt`, and `summary`.
 
 ### 2) `status`
@@ -148,8 +152,8 @@ Behavior:
 Purpose: Check whether a stored session exists.
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js status --topic <topic>
-node skills/lista-wallet-connect/dist/cli.js status --address 0xADDRESS
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs status --topic <topic>
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs status --address 0xADDRESS
 ```
 
 ### 3) `auth`
@@ -157,8 +161,8 @@ node skills/lista-wallet-connect/dist/cli.js status --address 0xADDRESS
 Purpose: Request a consent signature and mark session as authenticated.
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js auth --topic <topic>
-node skills/lista-wallet-connect/dist/cli.js auth --address 0xADDRESS
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs auth --topic <topic>
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs auth --address 0xADDRESS
 ```
 
 ### 4) `sign`
@@ -166,8 +170,8 @@ node skills/lista-wallet-connect/dist/cli.js auth --address 0xADDRESS
 Purpose: Sign an arbitrary message (`personal_sign`).
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js sign --topic <topic> --message "Hello"
-node skills/lista-wallet-connect/dist/cli.js sign --address 0xADDRESS --message "Hello" --chain eip155:56
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs sign --topic <topic> --message "Hello"
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs sign --address 0xADDRESS --message "Hello" --chain eip155:56
 ```
 
 ### 5) `sign-typed-data`
@@ -175,8 +179,8 @@ node skills/lista-wallet-connect/dist/cli.js sign --address 0xADDRESS --message 
 Purpose: Sign EIP-712 typed data (`eth_signTypedData_v4`).
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js sign-typed-data --topic <topic> --data '{"domain":...,"types":...,"message":...}'
-node skills/lista-wallet-connect/dist/cli.js sign-typed-data --address 0xADDRESS --data @/path/to/typed-data.json --chain eip155:1
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs sign-typed-data --topic <topic> --data '{"domain":...,"types":...,"message":...}'
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs sign-typed-data --address 0xADDRESS --data @/path/to/typed-data.json --chain eip155:1
 ```
 
 ### 6) `send-tx`
@@ -193,13 +197,13 @@ Examples:
 
 ```bash
 # native
-node skills/lista-wallet-connect/dist/cli.js send-tx --topic <topic> --chain eip155:56 --to 0xRECIPIENT --amount 0.1
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs send-tx --topic <topic> --chain eip155:56 --to 0xRECIPIENT --amount 0.1
 
 # erc20
-node skills/lista-wallet-connect/dist/cli.js send-tx --topic <topic> --chain eip155:56 --to 0xRECIPIENT --token USDT --amount 10
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs send-tx --topic <topic> --chain eip155:56 --to 0xRECIPIENT --token USDT --amount 10
 
 # ENS on ethereum
-node skills/lista-wallet-connect/dist/cli.js send-tx --topic <topic> --chain eip155:1 --to vitalik.eth --amount 0.01
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs send-tx --topic <topic> --chain eip155:1 --to vitalik.eth --amount 0.01
 ```
 
 ### 7) `call`
@@ -216,16 +220,16 @@ Examples:
 
 ```bash
 # contract call with calldata
-node skills/lista-wallet-connect/dist/cli.js call --topic <topic> --chain eip155:56 --to 0xCONTRACT --data 0xCALLDATA
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs call --topic <topic> --chain eip155:56 --to 0xCONTRACT --data 0xCALLDATA
 
 # with native value
-node skills/lista-wallet-connect/dist/cli.js call --topic <topic> --chain eip155:56 --to 0xCONTRACT --data 0xCALLDATA --value 0.01
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs call --topic <topic> --chain eip155:56 --to 0xCONTRACT --data 0xCALLDATA --value 0.01
 
 # custom gas
-node skills/lista-wallet-connect/dist/cli.js call --topic <topic> --chain eip155:56 --to 0xCONTRACT --data 0xCALLDATA --gas 500000
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs call --topic <topic> --chain eip155:56 --to 0xCONTRACT --data 0xCALLDATA --gas 500000
 
 # force send without simulation (risky)
-node skills/lista-wallet-connect/dist/cli.js call --topic <topic> --chain eip155:56 --to 0xCONTRACT --data 0xCALLDATA --no-simulate
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs call --topic <topic> --chain eip155:56 --to 0xCONTRACT --data 0xCALLDATA --no-simulate
 ```
 
 ### 8) `balance`
@@ -233,10 +237,10 @@ node skills/lista-wallet-connect/dist/cli.js call --topic <topic> --chain eip155
 Purpose: Query native + configured token balances without wallet signature.
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js balance --topic <topic>
-node skills/lista-wallet-connect/dist/cli.js balance --topic <topic> --chain eip155:56
-node skills/lista-wallet-connect/dist/cli.js balance --address 0xADDRESS --chain eip155:56
-node skills/lista-wallet-connect/dist/cli.js balance
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs balance --topic <topic>
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs balance --topic <topic> --chain eip155:56
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs balance --address 0xADDRESS --chain eip155:56
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs balance
 ```
 
 ### 9) `tokens`
@@ -244,8 +248,8 @@ node skills/lista-wallet-connect/dist/cli.js balance
 Purpose: Show token registry for a chain.
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js tokens
-node skills/lista-wallet-connect/dist/cli.js tokens --chain eip155:56
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs tokens
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs tokens --chain eip155:56
 ```
 
 ### 10) `sessions`
@@ -253,7 +257,7 @@ node skills/lista-wallet-connect/dist/cli.js tokens --chain eip155:56
 Purpose: Dump raw saved sessions JSON (internal/debug usage).
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js sessions
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs sessions
 ```
 
 ### 11) `list-sessions`
@@ -261,7 +265,7 @@ node skills/lista-wallet-connect/dist/cli.js sessions
 Purpose: Human-readable session listing.
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js list-sessions
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs list-sessions
 ```
 
 ### 12) `whoami`
@@ -269,9 +273,9 @@ node skills/lista-wallet-connect/dist/cli.js list-sessions
 Purpose: Show account details for a session, or latest session if omitted.
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js whoami --topic <topic>
-node skills/lista-wallet-connect/dist/cli.js whoami --address 0xADDRESS
-node skills/lista-wallet-connect/dist/cli.js whoami
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs whoami --topic <topic>
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs whoami --address 0xADDRESS
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs whoami
 ```
 
 ### 13) `delete-session`
@@ -279,8 +283,8 @@ node skills/lista-wallet-connect/dist/cli.js whoami
 Purpose: Remove a saved session entry.
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js delete-session --topic <topic>
-node skills/lista-wallet-connect/dist/cli.js delete-session --address 0xADDRESS
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs delete-session --topic <topic>
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs delete-session --address 0xADDRESS
 ```
 
 ### 14) `health`
@@ -288,10 +292,10 @@ node skills/lista-wallet-connect/dist/cli.js delete-session --address 0xADDRESS
 Purpose: Ping session(s) for liveness and optionally clean dead sessions.
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js health --topic <topic>
-node skills/lista-wallet-connect/dist/cli.js health --address 0xADDRESS
-node skills/lista-wallet-connect/dist/cli.js health --all
-node skills/lista-wallet-connect/dist/cli.js health --all --clean
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs health --topic <topic>
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs health --address 0xADDRESS
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs health --all
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs health --all --clean
 ```
 
 ### 15) `version`
@@ -299,7 +303,7 @@ node skills/lista-wallet-connect/dist/cli.js health --all --clean
 Purpose: Print skill version.
 
 ```bash
-node skills/lista-wallet-connect/dist/cli.js version
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs version
 ```
 
 ## Common Options
@@ -319,13 +323,13 @@ node skills/lista-wallet-connect/dist/cli.js version
 
 ```bash
 # 1) pair
-node skills/lista-wallet-connect/dist/cli.js pair --chains eip155:56,eip155:1 --open
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs pair --chains eip155:56,eip155:1 --open
 
 # 2) auth
-node skills/lista-wallet-connect/dist/cli.js auth --topic <topic>
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs auth --topic <topic>
 
 # 3) verify
-node skills/lista-wallet-connect/dist/cli.js whoami --topic <topic>
+node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs whoami --topic <topic>
 ```
 
 ## Integration Notes (with lista-lending)

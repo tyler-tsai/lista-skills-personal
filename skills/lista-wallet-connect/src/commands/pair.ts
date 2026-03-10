@@ -11,12 +11,6 @@ import { getClient } from "../client.js";
 import { saveSession, SESSIONS_DIR } from "../storage.js";
 import type { ParsedArgs } from "../types.js";
 
-const PAIR_HEARTBEAT_MS = 10000;
-
-function shouldEmitStdoutHeartbeat(): boolean {
-  return !process.stdout.isTTY || process.env.WC_STDOUT_HEARTBEAT === "1";
-}
-
 /**
  * Detect if running in a terminal environment where we should auto-open QR.
  * Returns true for: direct terminal, SSH, VSCode integrated terminal
@@ -55,6 +49,14 @@ function openFile(filePath: string): boolean {
   } catch {
     return false;
   }
+}
+
+function buildQrOpenCommands(qrPath: string): { macos: string; linux: string; windows: string } {
+  return {
+    macos: `open "${qrPath}"`,
+    linux: `xdg-open "${qrPath}"`,
+    windows: `start "" "${qrPath}"`,
+  };
 }
 
 const NAMESPACE_CONFIG: Record<string, { methods: string[]; events: string[] }> = {
@@ -140,6 +142,9 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
   const qrPath = join(SESSIONS_DIR, `qr-${Date.now()}.png`);
   mkdirSync(SESSIONS_DIR, { recursive: true });
   await QRCode.toFile(qrPath, uri!, { width: 400, margin: 2 });
+  const qrMarkdown = `![WalletConnect QR](${qrPath})`;
+  const qrOpenCommands = buildQrOpenCommands(qrPath);
+  const openclawMediaDirective = `MEDIA:${qrPath}`;
 
   const autoOpen = shouldAutoOpenQR(args.open);
   let openedBySystem = false;
@@ -151,20 +156,45 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
 
   // Build output for agent/CLI environments.
   const output: Record<string, unknown> = {
-    uri,
-    qrPath,
-    qrMarkdown: `![WalletConnect QR](${qrPath})`,
     status: "waiting_for_approval",
     interactionRequired: true,
     userReminder:
       "Wallet pairing is waiting for your confirmation. Please open your wallet app and approve or reject the request.",
     message: "Scan and approve this WalletConnect request in your wallet app.",
-    deliveryHint: "Send qrPath as image attachment. If image delivery fails, share uri as plain text.",
+    qrPath,
+    qrMarkdown,
+    uri,
+    deliveryPlan: {
+      preferred: ["image_attachment", "markdown_image"],
+      fallback: "wc_uri",
+      fallbackWhen: [
+        "image_not_supported",
+        "image_render_failed",
+        "image_delivery_failed",
+      ],
+      image: {
+        qrPath,
+        qrMarkdown,
+        qrOpenCommands,
+      },
+      wcUri: {
+        uri,
+      },
+    },
+    deliveryHint:
+      "Primary delivery is QR image (qrPath/qrMarkdown). Use wc URI only when image rendering or image delivery is not supported.",
+    openclaw: {
+      mediaDirective: openclawMediaDirective,
+      fallbackUri: uri,
+      rule:
+        "For OpenClaw channel delivery, emit mediaDirective as a standalone line first. Only use fallbackUri when media delivery is unsupported or fails.",
+    },
   };
 
   if (!autoOpen || !openedBySystem) {
     output.note =
-      "If image preview is unavailable, open qrPath manually (macOS: open <qrPath>, Linux: xdg-open <qrPath>, Windows: start <qrPath>) or use the wc: uri directly in your wallet app.";
+      "If QR image preview is unavailable, try opening qrPath with a system image viewer first. Use the wc URI only if image rendering/delivery is not supported.";
+    output.qrOpenCommands = qrOpenCommands;
   }
 
   if (autoOpen && !openedBySystem) {
@@ -172,24 +202,6 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
   }
 
   console.log(JSON.stringify(output));
-
-  const emitStdoutHeartbeat = shouldEmitStdoutHeartbeat();
-  const waitingStartedAt = Date.now();
-  const heartbeatTimer = setInterval(() => {
-    const heartbeat = {
-      status: "waiting_for_approval",
-      phase: "pair",
-      elapsedMs: Date.now() - waitingStartedAt,
-      interactionRequired: true,
-      userReminder:
-        "Wallet pairing is waiting for your confirmation. Please open your wallet app and approve or reject the request.",
-      message: "Waiting for wallet approval.",
-    };
-    console.error(JSON.stringify(heartbeat));
-    if (emitStdoutHeartbeat) {
-      console.log(JSON.stringify(heartbeat));
-    }
-  }, PAIR_HEARTBEAT_MS);
 
   try {
     const session = await approval();
@@ -227,8 +239,6 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
     );
   } catch (err) {
     console.log(JSON.stringify({ status: "rejected", error: (err as Error).message }));
-  } finally {
-    clearInterval(heartbeatTimer);
   }
 
   await client.core.relayer.transportClose().catch(() => {});
