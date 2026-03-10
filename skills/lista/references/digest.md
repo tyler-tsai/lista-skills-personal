@@ -8,12 +8,23 @@ Position overview + estimated yield + market snapshot in one report.
 
 Positions: same as Report A step A.1, metrics via `references/domain.md` (MCP-based).
 
-Vaults:
+User vault deposits:
+- MCP: `lista_get_dashboard({ wallet: "<address>" })` → use `vaults[]` (per-vault `assetsUsd`, `apy`, `emissionApy`)
+- moolah.js: `node skills/lista/scripts/moolah.js dashboard <address>` → use `vaultDeposits[]` (same fields: `assetsUsd`, `apy`, `emissionApy`)
+
+Protocol-level vault data (for Market Snapshot section):
 ```
 lista_get_lending_vaults({ pageSize: 50, chain: "<chain>" })
 ```
 
+**Vault fallback — moolah.js** (if MCP unavailable):
+```bash
+node skills/lista/scripts/moolah.js --chain <bsc|eth> vaults
+```
+
 Yield estimation:
+- `supplyUSD` = user's `assetsUsd` per vault (from dashboard, NOT protocol TVL)
+- `vaultAPY` = `apy + emissionApy` from the same vault record
 - `estimatedDailyYield = supplyUSD × vaultAPY / 365` per vault
 - `estimatedWeeklyYield = estimatedDailyYield × 7`
 
@@ -22,6 +33,12 @@ Claimable rewards:
 lista_get_rewards({ wallet: "<address>" })
 ```
 Returns claimable rewards across all sources (LISTA emission, bribe, distributor). Show non-zero reward lines only.
+
+**Rewards fallback — moolah.js** (if MCP unavailable):
+```bash
+node skills/lista/scripts/moolah.js rewards <address>
+```
+Returns JSON with `rewards[]` (each: `source`, `amount`, `symbol`, `usd`) and `totalUsd`.
 
 Market snapshot rate deltas:
 - If previous rate data is available (e.g. from a prior run), show change indicators: ↑, ↓, or "unchanged" / "持平"
@@ -40,12 +57,17 @@ Wallet: 0xAbCd...5678
 
 🏦 Lending Positions
 ─────────────────────
+
+- - - - -
+
 #1 BTCB / U
 Collateral: 2.50 BTCB (~＄250,000)
 Borrowed: 100,000.00 U (~＄100,000)
 Health factor: 2.15 ✅
 LTV: 40.0% / LLTV: 86.0%
 Liq. price: ＄46,511 / BTCB (current: ＄100,000)
+
+- - - - -
 
 ─────────────────────
 
@@ -98,12 +120,17 @@ Repay debt or add collateral immediately.
 
 🏦 借貸持倉
 ─────────────────────
+
+- - - - -
+
 #1 BTCB / U
 抵押品：2.50 BTCB（約 ＄250,000）
 已借出：100,000.00 U（約 ＄100,000）
 健康係數：2.15 ✅
 LTV：40.0% / 清算線：86.0%
 清算價格：＄46,511 / BTCB（當前價：＄100,000）
+
+- - - - -
 
 ─────────────────────
 

@@ -8,6 +8,13 @@ Check all positions for liquidation risk and flag those approaching thresholds.
 
 Same as Report A steps A.1–A.2. Use `references/domain.md` for MCP data fetching and metric computation.
 
+**Fallback — moolah.js** (if MCP unavailable):
+```bash
+node skills/lista/scripts/moolah.js --chain <bsc|eth> dashboard <address>
+```
+
+Follow the fallback chain in `domain.md`. Position data requires MCP or moolah.js — curl alone cannot serve this report.
+
 ## D.2 — Apply alert thresholds
 
 For each position with debt > 0 (i.e. `borrows[].amount > 0`):
@@ -63,8 +70,20 @@ Wallet: 0xAbCd...5678
 
 No positions approaching liquidation.
 
-#1 BTCB / U | HF: 1.83 ✅ | LTV: 47.1% / 86.0% | gap: 38.9%
-#2 ETH / USD1 | HF: 2.14 ✅ | LTV: 37.4% / 80.0% | gap: 42.6%
+- - - - -
+
+#1  BTCB / U
+Health factor: 1.83 ✅
+LTV / LLTV: 47.1% / 86.0%
+LTV gap: 38.9%
+
+
+#2  ETH / USD1
+Health factor: 2.14 ✅
+LTV / LLTV: 37.4% / 80.0%
+LTV gap: 42.6%
+
+- - - - -
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 Threshold: LLTV >= 90% → gap 0.5% | LLTV < 90% → gap 5%
@@ -105,8 +124,20 @@ LTV 差距：0.4% ⚠️ 低於預警閾值（0.5%）
 
 沒有持倉接近清算線。
 
-#1 BTCB / U | 健康係數：1.83 ✅ | LTV：47.1% / 86.0% | 差距：38.9%
-#2 ETH / USD1 | 健康係數：2.14 ✅ | LTV：37.4% / 80.0% | 差距：42.6%
+- - - - -
+
+#1  BTCB / U
+健康係數：1.83 ✅
+LTV / 清算線：47.1% / 86.0%
+LTV 差距：38.9%
+
+
+#2  ETH / USD1
+健康係數：2.14 ✅
+LTV / 清算線：37.4% / 80.0%
+LTV 差距：42.6%
+
+- - - - -
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 預警閾值：LLTV >= 90% → 差距 0.5% | LLTV < 90% → 差距 5%

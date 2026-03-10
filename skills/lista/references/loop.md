@@ -30,6 +30,12 @@ From the returned list, find the entry where `collateral == <collateral_asset>`.
 If no matching market is found, paginate (`page: 2`, `page: 3`) or drop the keyword
 filter and scan all markets. Inform the user if the market still cannot be found.
 
+**Fallback — moolah.js** (if MCP unavailable):
+```bash
+node skills/lista/scripts/moolah.js --chain <bsc|eth> markets <borrow_asset>
+```
+Returns JSON with `markets[]` containing `borrowApy`, `lltv`, `id`, `collateral`, `loan`, `zone` per market. Filter by `collateral` field to find the matching market.
+
 ## F.2 — Fetch token prices
 
 Use the **Token price resolution** section in `domain.md` to get collateral and loan prices.
@@ -43,6 +49,14 @@ lista_get_staking_info()
 ```
 
 Use the returned staking APR/APY as native yield.
+
+**Fallback — moolah.js** (if MCP unavailable):
+```bash
+node skills/lista/scripts/moolah.js staking
+```
+Returns JSON with `apr`, `comprehensiveApy`, and `locked` (3m/6m/12m).
+
+If moolah.js is also unavailable: slisBNB → use 2.8% default. Other LSTs → use 0%.
 
 For other assets:
 - PT tokens: use fixed rate from `terms.apy` in market response
@@ -91,13 +105,51 @@ Lista Lending — Loop Strategy: slisBNB/WBNB
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 LLTV: 86%  |  Borrow Rate: 2.6% APY  |  slisBNB Native Yield: 4.2%
 
-Loops │ Collateral      │ Debt          │ Leverage │ Net APY │ Liq Price │ Buffer
-──────┼─────────────────┼───────────────┼──────────┼─────────┼───────────┼───────
-  0   │ 10.0 slisBNB    │ 0             │  1.00×   │  4.20%  │     —     │   —
-  1   │ 17.0 slisBNB    │  7.0 WBNB    │  1.70×   │  5.80%  │  ＄195    │  28%
-  2   │ 21.9 slisBNB    │ 11.9 WBNB    │  2.19×   │  6.40%  │  ＄210    │  23%
-  3   │ 25.3 slisBNB    │ 15.3 WBNB    │  2.53×   │  6.70%  │  ＄221    │  19%  <- Optimal
-  4   │ 27.7 slisBNB    │ 17.7 WBNB    │  2.77×   │  6.60%  │  ＄230    │  15%  ⚠️
+- - - - -
+
+Loop 0
+Collateral: 10.0 slisBNB
+Debt: 0
+Leverage: 1.00x
+Net APY: 4.20%
+Liq. price: —
+Buffer: —
+
+
+Loop 1
+Collateral: 17.0 slisBNB
+Debt: 7.0 WBNB
+Leverage: 1.70x
+Net APY: 5.80%
+Liq. price: ＄195
+Buffer: 28%
+
+
+Loop 2
+Collateral: 21.9 slisBNB
+Debt: 11.9 WBNB
+Leverage: 2.19x
+Net APY: 6.40%
+Liq. price: ＄210
+Buffer: 23%
+
+
+Loop 3  <- Optimal
+Collateral: 25.3 slisBNB
+Debt: 15.3 WBNB
+Leverage: 2.53x
+Net APY: 6.70%
+Liq. price: ＄221
+Buffer: 19%
+
+
+Loop 4  ⚠️
+Collateral: 27.7 slisBNB
+Debt: 17.7 WBNB
+Leverage: 2.77x
+Net APY: 6.60%
+Liq. price: ＄230
+Buffer: 15%
 
 - - - - -
 
@@ -119,13 +171,51 @@ Lista Lending — 槓桿策略：slisBNB/WBNB
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 LLTV：86%  |  借款利率：2.6% APY  |  slisBNB 原生收益：4.2%
 
-循環 │ 抵押品            │ 負債          │ 槓桿   │ 淨年化 │ 清算價格  │ 緩衝
-─────┼───────────────────┼───────────────┼────────┼────────┼───────────┼──────
-  0  │ 10.0 slisBNB      │ 0             │ 1.00×  │ 4.20%  │     —     │   —
-  1  │ 17.0 slisBNB      │  7.0 WBNB    │ 1.70×  │ 5.80%  │ ＄195     │ 28%
-  2  │ 21.9 slisBNB      │ 11.9 WBNB    │ 2.19×  │ 6.40%  │ ＄210     │ 23%
-  3  │ 25.3 slisBNB      │ 15.3 WBNB    │ 2.53×  │ 6.70%  │ ＄221     │ 19%  <- 最佳
-  4  │ 27.7 slisBNB      │ 17.7 WBNB    │ 2.77×  │ 6.60%  │ ＄230     │ 15%  ⚠️
+- - - - -
+
+循環 0
+抵押品：10.0 slisBNB
+負債：0
+槓桿：1.00x
+淨年化：4.20%
+清算價格：—
+緩衝：—
+
+
+循環 1
+抵押品：17.0 slisBNB
+負債：7.0 WBNB
+槓桿：1.70x
+淨年化：5.80%
+清算價格：＄195
+緩衝：28%
+
+
+循環 2
+抵押品：21.9 slisBNB
+負債：11.9 WBNB
+槓桿：2.19x
+淨年化：6.40%
+清算價格：＄210
+緩衝：23%
+
+
+循環 3  <- 最佳
+抵押品：25.3 slisBNB
+負債：15.3 WBNB
+槓桿：2.53x
+淨年化：6.70%
+清算價格：＄221
+緩衝：19%
+
+
+循環 4  ⚠️
+抵押品：27.7 slisBNB
+負債：17.7 WBNB
+槓桿：2.77x
+淨年化：6.60%
+清算價格：＄230
+緩衝：15%
 
 - - - - -
 

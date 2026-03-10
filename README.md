@@ -79,7 +79,7 @@ Each skill is a plain markdown prompt file. The LLM loads the relevant skill and
 4. **`lista_get_oracle_price`** — token and LP price (ERC20, LST, Smart Lending LP)
 5. **`lista_get_staking_info`** — slisBNB / BNB-LST native staking yield
 
-No backend infrastructure required. `moolah.js` is available as a last-resort fallback for direct RPC access when MCP is unavailable.
+No backend infrastructure required. When MCP is unavailable, skills fall back to `skills/lista/scripts/moolah.js` — a self-contained Node.js script (no `npm install`) that hits the Lista REST API directly.
 
 SKILL.md uses progressive disclosure: it's a compact orchestrator that dispatches to reference files in `references/` on demand, so the LLM only loads what it needs for the selected report type.
 

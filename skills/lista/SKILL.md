@@ -7,28 +7,20 @@ description: Lista Lending assistant — position report, market overview, yield
 
 Your Lista Lending (Moolah) assistant on BSC and Ethereum. Choose a function below.
 
-**MCP tools:** `lista_get_position`, `lista_get_borrow_markets`, `lista_get_lending_vaults`, `lista_get_oracle_price`, `lista_get_staking_info`, `lista_get_dashboard`, `lista_get_rewards`
+## Data sources — silent fallback
 
-**First-run check:** If any `lista_*` MCP tool call fails with a connection error, the Lista MCP server is not configured. Guide the user:
+Try each source in order. Move to the next silently on any error (connection error, tool not found, command not recognized). NEVER ask the user to install, configure, or set up anything.
 
-> Lista MCP server is not connected. To set it up:
->
-> **Claude Code:**
-> ```
-> claude mcp add lista --transport sse https://mcp.lista.org/mcp
-> ```
->
-> **OpenClaw** — add to `openclaw.json`:
-> ```json
-> { "mcpServers": { "lista": { "transport": "streamable-http", "url": "https://mcp.lista.org/mcp" } } }
-> ```
->
-> **Other MCP clients:** Add to your MCP config:
-> ```json
-> { "mcpServers": { "lista": { "url": "https://mcp.lista.org/mcp" } } }
-> ```
->
-> Then restart your session and try again.
+1. MCP tools (preferred): `lista_get_position`, `lista_get_borrow_markets`, `lista_get_lending_vaults`, `lista_get_oracle_price`, `lista_get_staking_info`, `lista_get_dashboard`, `lista_get_rewards`
+2. moolah.js (Node.js, no install needed): `node skills/lista/scripts/moolah.js [--chain bsc|eth] <command>`
+3. REST API (curl): `curl -s "https://api.lista.org/api/moolah/<endpoint>"`
+
+Each reference file lists the exact fallback commands per data step.
+
+> Performance tip (optional): For the best experience, connect the Lista MCP server. This is NOT required — the skill works without it.
+> - Claude Code: `claude mcp add lista --transport sse https://mcp.lista.org/mcp`
+> - OpenClaw: `{ "mcpServers": { "lista": { "transport": "streamable-http", "url": "https://mcp.lista.org/mcp" } } }`
+> - Other MCP clients: `{ "mcpServers": { "lista": { "url": "https://mcp.lista.org/mcp" } } }`
 
 ---
 
@@ -85,14 +77,14 @@ Use the selected language for all output below.
 4. **＄ in templates = $ in output.** Templates use fullwidth ＄ for escaping; replace with normal $ when generating.
 5. **Round all numbers to 2 decimal places.** Token amounts (e.g. `4933.97 slisBNB`), USD values (e.g. `~$3.19M`), percentages (e.g. `71.2%`), and health factor (e.g. `1.21`) all display at most 2 decimal places. Do NOT output raw MCP precision (e.g. `4933.97414194585166222` is wrong; `4933.97` is correct).
 6. **Do NOT add commentary, disclaimers, or extra text** outside the template structure. The report IS the output.
-7. **Data source label (`<DATA_SOURCE>`):** Use `Lista MCP` if all data was fetched via `lista_*` MCP tools; use `Lista API` if all data was fetched via the REST API (api.lista.org); use `Lista MCP + API` if both were used (MCP with REST API fallback).
+7. **Data source label (`<DATA_SOURCE>`):** Use `Lista MCP` if all data was fetched via `lista_*` MCP tools; use `Lista API` if all data was fetched via moolah.js or curl (both hit api.lista.org). If multiple sources were used, combine labels (e.g. `Lista MCP + API`).
 8. **Network label (`<NETWORK>`):** Resolve from inferred chain:
    - `"bsc"` → EN: `BSC Mainnet` / ZH: `BSC 主網`
    - `"ethereum"` → EN: `Ethereum Mainnet` / ZH: `ETH 主網`
    - `"bsc,ethereum"` → EN: `BSC + Ethereum` / ZH: `BSC + ETH`
 9. **No free summaries.** Do NOT paraphrase, summarise, or add analyst commentary. The template output is the complete and only permitted response.
 10. **No preamble or trailing remarks.** Do NOT write "Here is your report", "Sure", "Let me check", "Done", or any text before or after the report block.
-11. **Table layout is mandatory.** When the reference template uses table rows (`| col | col |`), that exact syntax MUST appear for every data row. Do NOT replace table rows with bullet points (`•`), dashes (`-`), or prose paragraphs — even if an alternative layout seems clearer. No exceptions.
+11. **Line-per-field layout is mandatory.** Each data point appears on its own labeled line. Data groups are wrapped with `- - - - -` at start and end, separated by 2 blank lines. Do NOT use markdown tables (`| col | col |`), bullet points, or compress multiple fields onto one line.
 12. **No invented sections.** Do NOT add overview blocks, summary paragraphs, or extra headings that are not present in the reference template. Every section heading and block in the output must correspond to a section in the template.
 
 ---
@@ -177,7 +169,7 @@ Pass the resolved chain to all MCP tool calls in the selected report reference.
 
 1. Call the Read tool on **every** reference file listed in the table below for the selected report type.
 2. Do NOT generate any output from memory or prior context. If you have not read the file in this session using the Read tool, read it now.
-3. Always prefer `lista_*` MCP tools for all data fetching. Only use moolah.js or REST API fallbacks if the MCP tool call returns a connection error.
+3. Follow the fallback chain in "Data sources" above. Move to the next source silently on any error. Never ask the user to configure a data source.
 
 | Report type | Read these files |
 |---|---|
@@ -197,14 +189,14 @@ Follow the instructions in the referenced files to fetch data, compute metrics, 
 Before writing the first character of report output, verify every item below. If any check fails, fix it first.
 
 - [ ] I called the Read tool on every reference file listed in Step 3 for this report type.
-- [ ] I called at least one `lista_*` MCP tool and received live data.
+- [ ] I fetched live data via at least one source (MCP, moolah.js, or curl).
 - [ ] I am using the correct language template (EN or 繁體中文 based on Step 0).
 - [ ] My first line of output is character-for-character identical to the first line of the reference template (e.g. `Lista Lending — Position Report` or `Lista Lending — 持倉報告`). If it is not, STOP and restart output.
-- [ ] Every data row uses the table format (`| # | col | col |`) from the template — no bullet points (•), dashes (-), or prose substitutions.
+- [ ] Every data row uses the line-per-field format — no markdown tables (`| col |`), bullet points (•), or prose substitutions. Data groups are wrapped with `- - - - -`.
 - [ ] Every separator line (━━━, ─────, - - - - -) is copied character-for-character.
 - [ ] No field has been renamed, reordered, added, or omitted unless the template marks it conditional.
 - [ ] No overview block, summary paragraph, or section heading exists in my output that is not in the reference template.
 - [ ] No commentary, free summary, or disclaimer appears anywhere in the output.
-- [ ] `<DATA_SOURCE>` is replaced with the correct label (Lista MCP / Lista API / Lista MCP + API).
+- [ ] `<DATA_SOURCE>` is replaced with the correct label (`Lista MCP` / `Lista API` / `Lista MCP + API`).
 - [ ] `<NETWORK>` is replaced with the correct network label for the inferred chain.
 - [ ] No markdown bold (`**`), italics (`_`), headers (`#`), or links appear anywhere in the output.

@@ -24,6 +24,14 @@ lista_get_borrow_markets({ keyword: "<loanSymbol>", pageSize: 50 })
 
 Match each returned market by `id` to the user's active market IDs. Use the `lltv` field. If a market is not found on page 1, paginate with `page: 2`.
 
+**Fallback — moolah.js** (if MCP unavailable):
+```bash
+node skills/lista/scripts/moolah.js --chain <bsc|eth> dashboard <address>
+```
+Returns JSON with `positions[]` containing pre-computed metrics (`ltv`, `healthFactor`, `liqPriceUsd`, `buffer`, `riskLevel`, `netEquityUsd`). All values are human-readable — no conversion needed.
+
+**Fallback — curl**: Position data requires API calls. Without MCP or Node.js, report cannot run.
+
 ## A.2 — Compute metrics
 
 Join data by marketId and compute per `references/domain.md`. Amounts are human-readable — no 1e18 conversion needed.
@@ -57,10 +65,28 @@ Generated: <YYYY-MM-DD HH:MM> UTC  |  <NETWORK>
 
 Address 1: 0xAbCd…5678
 
-| # | Market | Risk | Collateral | Debt | Net Equity | HF | LTV / LLTV | Liq. Price |
-|---|--------|------|------------|------|------------|----|------------|------------|
-| 1 | BTCB / U | 🟢 SAFE | 398.85 BTCB (~＄38.25M) | 18,020,988 U (~＄18.02M) | ~＄20.23M | 1.83 ✅ | 47.1% / 86.0% | BTCB < ＄52,500 (now ＄96,000) |
-| 2 | slisBNB/BNB LP / BNB | 🟢 SAFE (correlated) | 120.00 LP (~＄78,143) | 50.00 BNB (~＄34,550) | ~＄43,593 | 1.95 ✅ | 44.2% / 86.0% | LP < ＄335 (now ＄651.19) |
+- - - - -
+
+#1  BTCB / U
+Risk: 🟢 SAFE
+Collateral: 398.85 BTCB (~＄38.25M)
+Debt: 18,020,988 U (~＄18.02M)
+Net equity: ~＄20.23M
+Health factor: 1.83 ✅
+LTV / LLTV: 47.1% / 86.0%
+Liq. price: BTCB < ＄52,500 (now ＄96,000)
+
+
+#2  slisBNB/BNB LP / BNB
+Risk: 🟢 SAFE (correlated)
+Collateral: 120.00 LP (~＄78,143 @ ＄651.19/LP)
+Debt: 50.00 BNB (~＄34,550)
+Net equity: ~＄43,593
+Health factor: 1.95 ✅
+LTV / LLTV: 44.2% / 86.0%
+Liq. price: LP < ＄335 (now ＄651.19)
+
+- - - - -
 
 Address 1 summary: 2 active positions  |  Net equity ~＄20.2M
 
@@ -75,8 +101,8 @@ Data: <DATA_SOURCE>  |  <NETWORK>
 ```
 
 Notes:
-- Supply-only positions: Debt, HF, LTV, Liq. Price columns show `—`.
-- LP collateral: show LP price in the Collateral column, e.g. `120.00 LP (~＄78,143 @ ＄651.19/LP)`.
+- Supply-only positions: Debt, Health factor, LTV / LLTV, Liq. price show `—`.
+- LP collateral: show LP price in the Collateral line, e.g. `120.00 LP (~＄78,143 @ ＄651.19/LP)`.
 - If user filtered by asset, replace title with: `Lista Lending — <ASSET> Position Report`.
 
 ### 繁體中文
@@ -88,10 +114,28 @@ Lista Lending — 持倉報告
 
 地址 1：0xAbCd…5678
 
-| # | 市場 | 風險 | 抵押品 | 負債 | 淨資產 | 健康係數 | LTV / 清算線 | 清算價格 |
-|---|------|------|--------|------|--------|----------|-------------|----------|
-| 1 | BTCB / U | 🟢 安全 | 398.85 BTCB（約 ＄38.25M） | 18,020,988 U（約 ＄18.02M） | 約 ＄20.23M | 1.83 ✅ | 47.1% / 86.0% | BTCB < ＄52,500（現 ＄96,000） |
-| 2 | slisBNB/BNB LP / BNB | 🟢 安全（相關對） | 120.00 LP（約 ＄78,143） | 50.00 BNB（約 ＄34,550） | 約 ＄43,593 | 1.95 ✅ | 44.2% / 86.0% | LP < ＄335（現 ＄651.19） |
+- - - - -
+
+#1  BTCB / U
+風險：🟢 安全
+抵押品：398.85 BTCB（約 ＄38.25M）
+負債：18,020,988 U（約 ＄18.02M）
+淨資產：約 ＄20.23M
+健康係數：1.83 ✅
+LTV / 清算線：47.1% / 86.0%
+清算價格：BTCB < ＄52,500（現 ＄96,000）
+
+
+#2  slisBNB/BNB LP / BNB
+風險：🟢 安全（相關對）
+抵押品：120.00 LP（約 ＄78,143 @ ＄651.19/LP）
+負債：50.00 BNB（約 ＄34,550）
+淨資產：約 ＄43,593
+健康係數：1.95 ✅
+LTV / 清算線：44.2% / 86.0%
+清算價格：LP < ＄335（現 ＄651.19）
+
+- - - - -
 
 地址 1 小結：2 個活躍持倉  |  淨資產約 ＄20.2M
 

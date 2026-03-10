@@ -43,11 +43,11 @@ lista_get_borrow_markets({ pageSize: 50, page: 3, chain: "<chain>" })   # if nee
 
 Stop paginating once all active market LLTVs are found.
 
-**moolah.js fallback** (if MCP is unavailable):
+**Fallback — moolah.js** (if MCP unavailable):
 ```bash
-node skills/lista/scripts/moolah.js --chain <bsc|eth> params <marketId>
-# Returns: loanToken, collateralToken, oracle, irm, lltv, lltvPct
+node skills/lista/scripts/moolah.js --chain <bsc|eth> dashboard <address>
 ```
+Returns JSON with `positions[]` containing pre-computed `collateralAmount`, `collateralUsd`, `debtAmount`, `debtUsd`, `collateralPrice`, `loanPrice`, `lltv`, `ltv`, `healthFactor`, `liqPriceUsd`, `buffer`, `riskLevel`, `isCorrelated`, `netEquityUsd`, and `vaultDeposits[]` (per-vault `assetsUsd`, `apy`, `emissionApy`). All values are human-readable — no conversion needed.
 
 Smart Lending detection: `collateralSymbol` contains `&` (e.g. "slisBNB & BNB"). Label as `slisBNB/BNB LP` in output.
 
@@ -69,11 +69,13 @@ For other tokens, try in order until one succeeds:
    ```
    Use the returned `price` if `found: true`.
 
-3. **moolah.js** (last resort — only if MCP is unavailable):
+3. **moolah.js** (if MCP is unavailable):
    ```bash
-   node skills/lista/scripts/moolah.js --chain <bsc|eth> token-price <tokenAddress>
-   node skills/lista/scripts/moolah.js --chain <bsc|eth> lp-price <marketId>   # Smart Lending LP
+   node skills/lista/scripts/moolah.js prices
    ```
+   Returns all token prices. Use `byAddress` map or `tokens[]` for symbol lookup.
+
+4. **curl**: No REST endpoint for individual token prices. If all above fail, display raw token amounts without USD conversion and note "price unavailable".
 
 ## Zone definitions
 
