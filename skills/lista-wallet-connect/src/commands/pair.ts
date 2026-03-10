@@ -35,7 +35,7 @@ function shouldAutoOpenQR(forceOpen?: boolean): boolean {
 /**
  * Open file with system default application (cross-platform)
  */
-function openFile(filePath: string): void {
+function openFile(filePath: string): boolean {
   const platform = process.platform;
   try {
     if (platform === "darwin") {
@@ -45,8 +45,9 @@ function openFile(filePath: string): void {
     } else {
       execSync(`xdg-open "${filePath}"`);
     }
+    return true;
   } catch {
-    // Silently fail if open command doesn't work
+    return false;
   }
 }
 
@@ -135,6 +136,12 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
   await QRCode.toFile(qrPath, uri!, { width: 400, margin: 2 });
 
   const autoOpen = shouldAutoOpenQR(args.open);
+  let openedBySystem = false;
+
+  // Auto-open QR in terminal environments
+  if (autoOpen) {
+    openedBySystem = openFile(qrPath);
+  }
 
   // Build output with optional base64 for non-TTY environments
   const output: Record<string, unknown> = {
@@ -150,12 +157,16 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
     output.qrBase64 = qrBase64;
   }
 
-  console.log(JSON.stringify(output, null, 2));
-
-  // Auto-open QR in terminal environments
-  if (autoOpen) {
-    openFile(qrPath);
+  if (!autoOpen || !openedBySystem) {
+    output.note =
+      "If the QR image is not displayed correctly, use another method (open qrPath manually or use uri directly).";
   }
+
+  if (autoOpen && !openedBySystem) {
+    output.openFailed = true;
+  }
+
+  console.log(JSON.stringify(output, null, 2));
 
   try {
     const session = await approval();
