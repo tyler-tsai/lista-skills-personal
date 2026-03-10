@@ -99,7 +99,7 @@ function buildPairSummary(accounts: string[]): {
 }
 
 export async function cmdPair(args: ParsedArgs): Promise<void> {
-  const chains = args.chains ? args.chains.split(",") : ["eip155:1"];
+  const chains = args.chains ? args.chains.split(",") : ["eip155:56", "eip155:1"];
 
   const byNamespace: Record<string, string[]> = {};
   for (const chain of chains) {
