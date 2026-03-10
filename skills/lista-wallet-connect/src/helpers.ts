@@ -115,6 +115,8 @@ export async function requestWithTimeout(
   const start = Date.now();
   const shouldEmitStdout =
     emitStdoutHeartbeat ?? (!process.stdout.isTTY || process.env.WC_STDOUT_HEARTBEAT === "1");
+  const userReminder =
+    "Wallet confirmation is pending. Please open your wallet app and approve or reject the request to continue.";
 
   const emitHeartbeat = () => {
     const elapsed = Date.now() - start;
@@ -123,6 +125,8 @@ export async function requestWithTimeout(
       phase,
       elapsedMs: elapsed,
       timeoutMs,
+      interactionRequired: true,
+      userReminder,
       ...(context || {}),
     };
     console.error(JSON.stringify(heartbeat));

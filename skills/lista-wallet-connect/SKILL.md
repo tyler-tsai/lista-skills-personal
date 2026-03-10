@@ -84,6 +84,7 @@ Optional: you can also place env vars in `skills/lista-wallet-connect/.env`.
 - Terminal statuses: `paired`, `authenticated`, `signed`, `sent`, `rejected`, `simulation_failed`, `error`.
 - If no terminal status arrives before process timeout, return timeout as an operational error and prompt retry.
 - For `pair`, use `qrPath` as image attachment (or `qrMarkdown` if renderer supports it). If image rendering fails, send the `uri` text fallback.
+- When a waiting event contains `interactionRequired: true`, show a user reminder immediately (once per request) using `userReminder` text, e.g. "Please approve/reject in your wallet app."
 
 ## Supported Chains
 

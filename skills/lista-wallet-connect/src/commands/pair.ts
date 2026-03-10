@@ -155,6 +155,9 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
     qrPath,
     qrMarkdown: `![WalletConnect QR](${qrPath})`,
     status: "waiting_for_approval",
+    interactionRequired: true,
+    userReminder:
+      "Wallet pairing is waiting for your confirmation. Please open your wallet app and approve or reject the request.",
     message: "Scan and approve this WalletConnect request in your wallet app.",
     deliveryHint: "Send qrPath as image attachment. If image delivery fails, share uri as plain text.",
   };
@@ -177,6 +180,9 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
       status: "waiting_for_approval",
       phase: "pair",
       elapsedMs: Date.now() - waitingStartedAt,
+      interactionRequired: true,
+      userReminder:
+        "Wallet pairing is waiting for your confirmation. Please open your wallet app and approve or reject the request.",
       message: "Waiting for wallet approval.",
     };
     console.error(JSON.stringify(heartbeat));
