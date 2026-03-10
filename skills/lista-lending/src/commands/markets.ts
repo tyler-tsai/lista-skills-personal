@@ -6,6 +6,7 @@
 import { fetchMarkets } from "../api.js";
 import { SUPPORTED_CHAINS } from "../config.js";
 import { setLastFilters } from "../context.js";
+import { printJson } from "./shared/output.js";
 import type { ListOrder } from "../types/lista-api.js";
 import {
   isPositiveInteger,
@@ -44,42 +45,34 @@ export async function cmdMarkets(args: MarketsArgs): Promise<void> {
   const chain = args.chain || "eip155:56";
 
   if (!isSupportedChain(chain, SUPPORTED_CHAINS)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: `Unsupported chain: ${chain}. Supported: ${SUPPORTED_CHAINS.join(", ")}`,
-      })
-    );
+    printJson({
+      status: "error",
+      reason: `Unsupported chain: ${chain}. Supported: ${SUPPORTED_CHAINS.join(", ")}`,
+    });
     process.exit(1);
   }
 
   if (args.page !== undefined && !isPositiveInteger(args.page)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "--page must be a positive integer",
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "--page must be a positive integer",
+    });
     process.exit(1);
   }
 
   if (args.pageSize !== undefined && !isPositiveInteger(args.pageSize)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "--page-size must be a positive integer",
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "--page-size must be a positive integer",
+    });
     process.exit(1);
   }
 
   if (args.order && !isValidOrder(args.order)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "--order must be asc or desc",
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "--order must be asc or desc",
+    });
     process.exit(1);
   }
 
@@ -119,60 +112,54 @@ export async function cmdMarkets(args: MarketsArgs): Promise<void> {
     });
 
     if (filteredMarkets.length === 0) {
-      console.log(
-        JSON.stringify({
-          status: "success",
-          chain,
-          markets: [],
-          message: "No markets found",
-          note: MARKET_OPERATION_LIMITATION_NOTE,
-        })
-      );
+      printJson({
+        status: "success",
+        chain,
+        markets: [],
+        message: "No markets found",
+        note: MARKET_OPERATION_LIMITATION_NOTE,
+      });
       return;
     }
 
     // Output JSON for agent parsing
-    console.log(
-      JSON.stringify({
-        status: "success",
-        chain,
-        count: filteredMarkets.length,
-        filters: {
-          page: args.page || 1,
-          pageSize: args.pageSize || 100,
-          sort: args.sort,
-          order: args.order,
-          zone: args.zone,
-          keyword: args.keyword,
-          loans: args.loans,
-          collaterals: args.collaterals,
-        },
-        note: MARKET_OPERATION_LIMITATION_NOTE,
-        markets: filteredMarkets.map((m, i) => ({
-          index: i,
-          marketId: m.id,
-          collateralSymbol: m.collateral,
-          loanSymbol: m.loan,
-          zone: m.zone,
-          termType: m.termType,
-          lltv: m.lltv,
-          supplyApy: m.supplyApy,
-          borrowRate: m.rate,
-          liquidity: m.liquidity,
-          liquidityUsd: m.liquidityUsd,
-          vaults: m.vaults?.map((v: { name: string }) => v.name).join(", "),
-          display: `[${i}] ${m.collateral}/${m.loan} - LLTV: ${(Number.parseFloat(m.lltv) * 100).toFixed(1)}%, Liquidity: $${formatUsd(m.liquidityUsd)}`,
-        })),
-      })
-    );
+    printJson({
+      status: "success",
+      chain,
+      count: filteredMarkets.length,
+      filters: {
+        page: args.page || 1,
+        pageSize: args.pageSize || 100,
+        sort: args.sort,
+        order: args.order,
+        zone: args.zone,
+        keyword: args.keyword,
+        loans: args.loans,
+        collaterals: args.collaterals,
+      },
+      note: MARKET_OPERATION_LIMITATION_NOTE,
+      markets: filteredMarkets.map((m, i) => ({
+        index: i,
+        marketId: m.id,
+        collateralSymbol: m.collateral,
+        loanSymbol: m.loan,
+        zone: m.zone,
+        termType: m.termType,
+        lltv: m.lltv,
+        supplyApy: m.supplyApy,
+        borrowRate: m.rate,
+        liquidity: m.liquidity,
+        liquidityUsd: m.liquidityUsd,
+        vaults: m.vaults?.map((v: { name: string }) => v.name).join(", "),
+        display: `[${i}] ${m.collateral}/${m.loan} - LLTV: ${(Number.parseFloat(m.lltv) * 100).toFixed(1)}%, Liquidity: $${formatUsd(m.liquidityUsd)}`,
+      })),
+    });
   } catch (err) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "sdk_error",
-        message: (err as Error).message,
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "sdk_error",
+      message: (err as Error).message,
+    });
     process.exit(1);
   }
 }

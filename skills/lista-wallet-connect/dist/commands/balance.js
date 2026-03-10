@@ -8,6 +8,7 @@ import { loadSessions } from "../storage.js";
 import { requireSession, findAccount, parseAccount } from "../helpers.js";
 import { getRpcCandidatesForChain, } from "../rpc.js";
 import { getTokensForChain } from "./tokens.js";
+import { printJson } from "../output.js";
 const EVM_CHAINS = {
     "eip155:1": { chain: mainnet, native: "ETH" },
     "eip155:56": { chain: bsc, native: "BNB" },
@@ -128,9 +129,9 @@ export async function cmdBalance(args) {
         }
     }
     if (accountsToCheck.length === 0) {
-        console.log(JSON.stringify({
+        printJson({
             error: "No accounts found. Use --topic, --address, or ensure sessions exist.",
-        }));
+        });
         return;
     }
     const seen = new Set();
@@ -150,5 +151,5 @@ export async function cmdBalance(args) {
             results.push({ chain, address, balances: [], error: `Unsupported chain: ${chain}` });
         }
     }
-    console.log(JSON.stringify(results, null, 2));
+    printJson(results);
 }

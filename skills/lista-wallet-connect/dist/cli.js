@@ -4,9 +4,12 @@ import { loadLocalEnv } from "./cli/env.js";
 import { renderHelp } from "./cli/help.js";
 import { loadCliMeta } from "./cli/meta.js";
 import { runCommand } from "./cli/router.js";
+import { setupDebugLogFile } from "./cli/debug-log.js";
+import { printErrorJson } from "./output.js";
+const parsed = parseCliInput();
+setupDebugLogFile("@lista-dao/lista-wallet-connect-skill", parsed.debugLogFile);
 loadLocalEnv();
 const meta = loadCliMeta();
-const parsed = parseCliInput();
 export const SKILL_VERSION = meta.skillVersion;
 export const SKILL_NAME = meta.skillName;
 if (!parsed.command || parsed.help) {
@@ -14,6 +17,6 @@ if (!parsed.command || parsed.help) {
     process.exit(0);
 }
 runCommand(parsed.command, parsed.args, meta).catch((err) => {
-    console.error(JSON.stringify({ error: err.message }));
+    printErrorJson({ error: err.message });
     process.exit(1);
 });

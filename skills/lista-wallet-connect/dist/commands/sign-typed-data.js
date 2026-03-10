@@ -5,6 +5,7 @@ import { readFileSync } from "fs";
 import { getClient } from "../client.js";
 import { loadSessions } from "../storage.js";
 import { requireSession, findAccount, parseAccount, requestWithTimeout } from "../helpers.js";
+import { printErrorJson, printJson } from "../output.js";
 /**
  * Parse and validate typed data from a JSON string or @file path.
  */
@@ -53,7 +54,7 @@ export function inferPrimaryType(types) {
 }
 export async function cmdSignTypedData(args) {
     if (!args.topic || !args.data) {
-        console.error(JSON.stringify({ error: "--topic (or --address) and --data required" }));
+        printErrorJson({ error: "--topic (or --address) and --data required" });
         process.exit(1);
     }
     let typedData;
@@ -61,7 +62,7 @@ export async function cmdSignTypedData(args) {
         typedData = parseTypedData(args.data);
     }
     catch (err) {
-        console.error(JSON.stringify({ error: err.message }));
+        printErrorJson({ error: err.message });
         process.exit(1);
     }
     const primaryType = typedData.primaryType ??
@@ -70,7 +71,7 @@ export async function cmdSignTypedData(args) {
                 return inferPrimaryType(typedData.types);
             }
             catch (err) {
-                console.error(JSON.stringify({ error: err.message }));
+                printErrorJson({ error: err.message });
                 process.exit(1);
             }
         })();
@@ -79,9 +80,9 @@ export async function cmdSignTypedData(args) {
     // EIP-712 is EVM-only — require an eip155 account
     const account = findAccount(sessionData.accounts, args.chain?.startsWith("eip155") ? args.chain : "eip155");
     if (!account) {
-        console.error(JSON.stringify({
+        printErrorJson({
             error: "No EVM (eip155) account found in session — EIP-712 is EVM-only",
-        }));
+        });
         process.exit(1);
     }
     const { chainId, address } = parseAccount(account);
@@ -103,7 +104,7 @@ export async function cmdSignTypedData(args) {
             primaryType,
         },
     });
-    console.log(JSON.stringify({ status: "signed", address, signature, chain: chainId, primaryType }));
+    printJson({ status: "signed", address, signature, chain: chainId, primaryType });
     await client.core.relayer.transportClose().catch(() => { });
     process.exit(0);
 }

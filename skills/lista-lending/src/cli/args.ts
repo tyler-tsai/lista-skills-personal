@@ -9,6 +9,7 @@ import type { VaultsArgs } from "../commands/vaults.js";
 export interface ParsedCliInput {
   command: string | undefined;
   help: boolean;
+  debugLogFile?: string;
   args: ParsedArgs;
   configArgs: ConfigArgs;
   vaultsArgs: VaultsArgs;
@@ -57,6 +58,7 @@ export function parseCliInput(): ParsedCliInput {
       "set-rpc": { type: "boolean" },
       "clear-rpc": { type: "boolean" },
       url: { type: "string" },
+      "debug-log-file": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -74,6 +76,7 @@ export function parseCliInput(): ParsedCliInput {
   return {
     command,
     help: Boolean(values.help),
+    debugLogFile: values["debug-log-file"],
     args: {
       vault: values.vault,
       market: values.market,

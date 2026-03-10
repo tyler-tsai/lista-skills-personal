@@ -5,6 +5,7 @@ export interface ParsedCliInput {
   command: string | undefined;
   args: ParsedArgs;
   help: boolean;
+  debugLogFile?: string;
 }
 
 export function parseCliInput(): ParsedCliInput {
@@ -27,6 +28,7 @@ export function parseCliInput(): ParsedCliInput {
       clean: { type: "boolean" },
       open: { type: "boolean" },
       "no-simulate": { type: "boolean" },
+      "debug-log-file": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });
@@ -34,6 +36,7 @@ export function parseCliInput(): ParsedCliInput {
   return {
     command: positionals[0],
     help: Boolean(values.help),
+    debugLogFile: values["debug-log-file"],
     args: {
       ...values,
       noSimulate: values["no-simulate"],

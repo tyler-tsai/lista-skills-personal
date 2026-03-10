@@ -5,6 +5,7 @@ import { parseAccountId } from "@walletconnect/utils";
 import { normalize } from "viem/ens";
 import { createPublicClient, http } from "viem";
 import { mainnet } from "viem/chains";
+import { printErrorJson, printJson, stringifyJson } from "./output.js";
 /**
  * Find an account in session matching a namespace (e.g. "eip155").
  */
@@ -56,7 +57,7 @@ export function encodeEvmMessage(message) {
 export function requireSession(sessions, topic) {
     const data = sessions[topic];
     if (!data) {
-        console.error(JSON.stringify({ error: "Session not found", topic }));
+        printErrorJson({ error: "Session not found", topic });
         process.exit(1);
     }
     return data;
@@ -67,7 +68,7 @@ export function requireSession(sessions, topic) {
 export function requireAccount(sessionData, chainHint, label = "matching") {
     const account = findAccount(sessionData.accounts, chainHint);
     if (!account) {
-        console.error(JSON.stringify({ error: `No ${label} account found`, chainHint }));
+        printErrorJson({ error: `No ${label} account found`, chainHint });
         process.exit(1);
     }
     return account;
@@ -102,9 +103,9 @@ export async function requestWithTimeout(client, requestParams, { timeoutMs = 30
             userReminder,
             ...(context || {}),
         };
-        console.error(JSON.stringify(heartbeat));
+        process.stderr.write(`${stringifyJson(heartbeat)}\n`);
         if (shouldEmitStdout) {
-            console.log(JSON.stringify(heartbeat));
+            printJson(heartbeat);
         }
     };
     emitHeartbeat();

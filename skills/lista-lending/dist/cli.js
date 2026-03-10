@@ -1,10 +1,13 @@
 #!/usr/bin/env tsx
 import { parseCliInput } from "./cli/args.js";
+import { setupDebugLogFile } from "./cli/debug-log.js";
 import { renderHelp } from "./cli/help.js";
 import { loadCliMeta } from "./cli/meta.js";
 import { runCommand } from "./cli/run.js";
-const meta = loadCliMeta();
+import { printErrorJson } from "./commands/shared/output.js";
 const parsed = parseCliInput();
+setupDebugLogFile("@lista-dao/lista-lending-skill", parsed.debugLogFile);
+const meta = loadCliMeta();
 export const SKILL_VERSION = meta.skillVersion;
 export const SKILL_NAME = meta.skillName;
 export const WALLET_CONNECT_VERSION = meta.walletConnectVersion;
@@ -20,6 +23,6 @@ runCommand(parsed.command, {
     holdingsArgs: parsed.holdingsArgs,
     selectArgs: parsed.selectArgs,
 }, meta).catch((err) => {
-    console.error(JSON.stringify({ error: err.message }));
+    printErrorJson({ error: err.message });
     process.exit(1);
 });

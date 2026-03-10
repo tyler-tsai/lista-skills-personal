@@ -8,6 +8,7 @@ import { execSync } from "child_process";
 import { parseAccountId, parseChainId } from "@walletconnect/utils";
 import { getClient } from "../client.js";
 import { saveSession, SESSIONS_DIR } from "../storage.js";
+import { printErrorJson, printJson } from "../output.js";
 /**
  * Detect if running in a terminal environment where we should auto-open QR.
  * Returns true for: direct terminal, SSH, VSCode integrated terminal
@@ -103,7 +104,9 @@ export async function cmdPair(args) {
     for (const chain of chains) {
         const { namespace } = parseChainId(chain);
         if (!NAMESPACE_CONFIG[namespace]) {
-            console.error(JSON.stringify({ error: `Unsupported namespace: ${namespace}. Only EVM (eip155) is supported.` }));
+            printErrorJson({
+                error: `Unsupported namespace: ${namespace}. Only EVM (eip155) is supported.`,
+            });
             process.exit(1);
         }
         if (!byNamespace[namespace])
@@ -179,7 +182,7 @@ export async function cmdPair(args) {
     if (autoOpen && !openedBySystem) {
         output.openFailed = true;
     }
-    console.log(JSON.stringify(output));
+    printJson(output);
     try {
         const session = await approval();
         const accounts = Object.values(session.namespaces).flatMap((ns) => ns.accounts || []);
@@ -192,7 +195,7 @@ export async function cmdPair(args) {
             peerName: walletName,
             createdAt: pairedAt,
         });
-        console.log(JSON.stringify({
+        printJson({
             status: "paired",
             message: `Wallet connected successfully (${walletName}).`,
             topic: session.topic,
@@ -209,10 +212,10 @@ export async function cmdPair(args) {
                 "Use whoami/status to verify the active session.",
                 "Use auth if a consent signature is required before operations.",
             ],
-        }));
+        });
     }
     catch (err) {
-        console.log(JSON.stringify({ status: "rejected", error: err.message }));
+        printJson({ status: "rejected", error: err.message });
     }
     await client.core.relayer.transportClose().catch(() => { });
     process.exit(0);

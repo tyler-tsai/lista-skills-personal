@@ -6,6 +6,7 @@ import { getClient } from "../client.js";
 import { loadSessions, saveSessions } from "../storage.js";
 import { findSessionByAddress } from "../client.js";
 import { redactAddress } from "../helpers.js";
+import { printErrorJson, printJson, stringifyJson } from "../output.js";
 import type { SignClient } from "@walletconnect/sign-client";
 import type { ParsedArgs } from "../types.js";
 
@@ -36,28 +37,24 @@ export async function cmdHealth(args: ParsedArgs): Promise<void> {
   if (args.all) {
     topics = Object.keys(sessions);
     if (topics.length === 0) {
-      console.log(JSON.stringify({ status: "no_sessions", message: "No sessions found" }));
+      printJson({ status: "no_sessions", message: "No sessions found" });
       process.exit(0);
     }
   } else if (args.topic) {
     if (!sessions[args.topic]) {
-      console.error(JSON.stringify({ error: "Session not found", topic: args.topic }));
+      printErrorJson({ error: "Session not found", topic: args.topic });
       process.exit(1);
     }
     topics = [args.topic];
   } else if (args.address) {
     const match = findSessionByAddress(sessions, args.address);
     if (!match) {
-      console.error(
-        JSON.stringify({ error: "No session found for address", address: args.address }),
-      );
+      printErrorJson({ error: "No session found for address", address: args.address });
       process.exit(1);
     }
     topics = [match.topic];
   } else {
-    console.error(
-      JSON.stringify({ error: "--topic, --address, or --all required for health command" }),
-    );
+    printErrorJson({ error: "--topic, --address, or --all required for health command" });
     process.exit(1);
   }
 
@@ -70,7 +67,7 @@ export async function cmdHealth(args: ParsedArgs): Promise<void> {
     const accounts = session.accounts || [];
     const peerName = session.peerName || "unknown";
 
-    process.stderr.write(JSON.stringify({ pinging: topic, peer: peerName }) + "\n");
+    process.stderr.write(`${stringifyJson({ pinging: topic, peer: peerName })}\n`);
 
     const { alive, error } = await pingSession(client, topic);
 
@@ -113,7 +110,7 @@ export async function cmdHealth(args: ParsedArgs): Promise<void> {
     sessions: results,
   };
 
-  console.log(JSON.stringify(output, null, 2));
+  printJson(output);
   await client.core.relayer.transportClose().catch(() => {});
   process.exit(0);
 }

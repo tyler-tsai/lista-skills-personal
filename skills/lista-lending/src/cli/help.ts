@@ -76,6 +76,7 @@ Options:
   --scope <type>             Holdings scope: all|vault|market|selected
   --show                     Show current selection/config
   --clear                    Clear selection
+  --debug-log-file <path>    Append structured stdout/stderr logs to a file (jsonl)
 
 Workflow Examples:
   Vault:

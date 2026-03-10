@@ -22,12 +22,14 @@ function parseCliInput() {
       clean: { type: "boolean" },
       open: { type: "boolean" },
       "no-simulate": { type: "boolean" },
+      "debug-log-file": { type: "string" },
       help: { type: "boolean", short: "h" }
     }
   });
   return {
     command: positionals[0],
     help: Boolean(values.help),
+    debugLogFile: values["debug-log-file"],
     args: {
       ...values,
       noSimulate: values["no-simulate"]
@@ -88,6 +90,7 @@ Options:
   --clean            (health) Remove dead sessions from storage
   --open             (pair) Force open QR in system viewer (for agent environments)
   --no-simulate      (call) Skip transaction simulation (not recommended)
+  --debug-log-file <path>  Append structured stdout/stderr logs to a file (jsonl)
 
 Supported Chains:
   eip155:1      Ethereum Mainnet
@@ -192,6 +195,17 @@ async function getClient() {
   return client;
 }
 
+// src/output.ts
+function stringifyJson(payload) {
+  return JSON.stringify(payload);
+}
+function printJson(payload) {
+  console.log(stringifyJson(payload));
+}
+function printErrorJson(payload) {
+  console.error(stringifyJson(payload));
+}
+
 // src/commands/pair.ts
 function shouldAutoOpenQR(forceOpen) {
   if (forceOpen) return true;
@@ -262,7 +276,9 @@ async function cmdPair(args) {
   for (const chain of chains) {
     const { namespace } = parseChainId(chain);
     if (!NAMESPACE_CONFIG[namespace]) {
-      console.error(JSON.stringify({ error: `Unsupported namespace: ${namespace}. Only EVM (eip155) is supported.` }));
+      printErrorJson({
+        error: `Unsupported namespace: ${namespace}. Only EVM (eip155) is supported.`
+      });
       process.exit(1);
     }
     if (!byNamespace[namespace]) byNamespace[namespace] = [];
@@ -332,7 +348,7 @@ async function cmdPair(args) {
   if (autoOpen && !openedBySystem) {
     output.openFailed = true;
   }
-  console.log(JSON.stringify(output));
+  printJson(output);
   try {
     const session = await approval();
     const accounts = Object.values(session.namespaces).flatMap((ns) => ns.accounts || []);
@@ -345,28 +361,26 @@ async function cmdPair(args) {
       peerName: walletName,
       createdAt: pairedAt
     });
-    console.log(
-      JSON.stringify({
-        status: "paired",
-        message: `Wallet connected successfully (${walletName}).`,
-        topic: session.topic,
-        accounts,
-        peerName: walletName,
-        pairedAt,
-        summary: {
-          chainCount: summary.chains.length,
-          accountCount: accounts.length,
-          chains: summary.chains,
-          primaryAccount: summary.primaryAccount
-        },
-        nextActions: [
-          "Use whoami/status to verify the active session.",
-          "Use auth if a consent signature is required before operations."
-        ]
-      })
-    );
+    printJson({
+      status: "paired",
+      message: `Wallet connected successfully (${walletName}).`,
+      topic: session.topic,
+      accounts,
+      peerName: walletName,
+      pairedAt,
+      summary: {
+        chainCount: summary.chains.length,
+        accountCount: accounts.length,
+        chains: summary.chains,
+        primaryAccount: summary.primaryAccount
+      },
+      nextActions: [
+        "Use whoami/status to verify the active session.",
+        "Use auth if a consent signature is required before operations."
+      ]
+    });
   } catch (err) {
-    console.log(JSON.stringify({ status: "rejected", error: err.message }));
+    printJson({ status: "rejected", error: err.message });
   }
   await client.core.relayer.transportClose().catch(() => {
   });
@@ -412,7 +426,7 @@ function encodeEvmMessage(message) {
 function requireSession(sessions, topic) {
   const data = sessions[topic];
   if (!data) {
-    console.error(JSON.stringify({ error: "Session not found", topic }));
+    printErrorJson({ error: "Session not found", topic });
     process.exit(1);
   }
   return data;
@@ -420,7 +434,7 @@ function requireSession(sessions, topic) {
 function requireAccount(sessionData, chainHint, label = "matching") {
   const account = findAccount(sessionData.accounts, chainHint);
   if (!account) {
-    console.error(JSON.stringify({ error: `No ${label} account found`, chainHint }));
+    printErrorJson({ error: `No ${label} account found`, chainHint });
     process.exit(1);
   }
   return account;
@@ -452,9 +466,10 @@ async function requestWithTimeout(client, requestParams, {
       userReminder,
       ...context || {}
     };
-    console.error(JSON.stringify(heartbeat));
+    process.stderr.write(`${stringifyJson(heartbeat)}
+`);
     if (shouldEmitStdout) {
-      console.log(JSON.stringify(heartbeat));
+      printJson(heartbeat);
     }
   };
   emitHeartbeat();
@@ -472,7 +487,7 @@ async function requestWithTimeout(client, requestParams, {
 // src/commands/auth.ts
 async function cmdAuth(args) {
   if (!args.topic) {
-    console.error(JSON.stringify({ error: "--topic required" }));
+    printErrorJson({ error: "--topic required" });
     process.exit(1);
   }
   const client = await getClient();
@@ -516,17 +531,15 @@ async function cmdAuth(args) {
       authSignature: signature,
       authTimestamp: timestamp
     });
-    console.log(
-      JSON.stringify({
-        status: "authenticated",
-        address: display,
-        signature,
-        nonce,
-        message
-      })
-    );
+    printJson({
+      status: "authenticated",
+      address: display,
+      signature,
+      nonce,
+      message
+    });
   } catch (err) {
-    console.log(JSON.stringify({ status: "rejected", error: err.message }));
+    printJson({ status: "rejected", error: err.message });
   }
   await client.core.relayer.transportClose().catch(() => {
   });
@@ -536,7 +549,7 @@ async function cmdAuth(args) {
 // src/commands/sign.ts
 async function cmdSign(args) {
   if (!args.topic || !args.message) {
-    console.error(JSON.stringify({ error: "--topic and --message required" }));
+    printErrorJson({ error: "--topic and --message required" });
     process.exit(1);
   }
   const client = await getClient();
@@ -547,7 +560,7 @@ async function cmdSign(args) {
     chainHint?.startsWith("eip155") ? chainHint : "eip155"
   );
   if (!account) {
-    console.error(JSON.stringify({ error: "No EVM account found", chainHint }));
+    printErrorJson({ error: "No EVM account found", chainHint });
     process.exit(1);
   }
   const { chainId, address } = parseAccount(account);
@@ -568,7 +581,7 @@ async function cmdSign(args) {
     }
   });
   const result = { status: "signed", address, signature, chain: chainId };
-  console.log(JSON.stringify(result));
+  printJson(result);
   await client.core.relayer.transportClose().catch(() => {
   });
   process.exit(0);
@@ -618,21 +631,21 @@ function inferPrimaryType(types) {
 }
 async function cmdSignTypedData(args) {
   if (!args.topic || !args.data) {
-    console.error(JSON.stringify({ error: "--topic (or --address) and --data required" }));
+    printErrorJson({ error: "--topic (or --address) and --data required" });
     process.exit(1);
   }
   let typedData;
   try {
     typedData = parseTypedData(args.data);
   } catch (err) {
-    console.error(JSON.stringify({ error: err.message }));
+    printErrorJson({ error: err.message });
     process.exit(1);
   }
   const primaryType = typedData.primaryType ?? (() => {
     try {
       return inferPrimaryType(typedData.types);
     } catch (err) {
-      console.error(JSON.stringify({ error: err.message }));
+      printErrorJson({ error: err.message });
       process.exit(1);
     }
   })();
@@ -643,11 +656,9 @@ async function cmdSignTypedData(args) {
     args.chain?.startsWith("eip155") ? args.chain : "eip155"
   );
   if (!account) {
-    console.error(
-      JSON.stringify({
-        error: "No EVM (eip155) account found in session \u2014 EIP-712 is EVM-only"
-      })
-    );
+    printErrorJson({
+      error: "No EVM (eip155) account found in session \u2014 EIP-712 is EVM-only"
+    });
     process.exit(1);
   }
   const { chainId, address } = parseAccount(account);
@@ -669,7 +680,7 @@ async function cmdSignTypedData(args) {
       primaryType
     }
   });
-  console.log(JSON.stringify({ status: "signed", address, signature, chain: chainId, primaryType }));
+  printJson({ status: "signed", address, signature, chain: chainId, primaryType });
   await client.core.relayer.transportClose().catch(() => {
   });
   process.exit(0);
@@ -761,12 +772,14 @@ var EXPLORER_URLS = {
 };
 async function cmdSendTx(args) {
   if (!args.topic) {
-    console.error(JSON.stringify({ error: "--topic required" }));
+    printErrorJson({ error: "--topic required" });
     process.exit(1);
   }
   const chain = args.chain || "eip155:1";
   if (chain !== "eip155:1" && chain !== "eip155:56") {
-    console.error(JSON.stringify({ error: `Unsupported chain: ${chain}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.` }));
+    printErrorJson({
+      error: `Unsupported chain: ${chain}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.`
+    });
     process.exit(1);
   }
   const client = await getClient();
@@ -775,14 +788,14 @@ async function cmdSendTx(args) {
   const { address: from } = parseAccount(accountStr);
   const resolvedTo = await resolveAddress(args.to);
   if (resolvedTo !== args.to) {
-    console.error(JSON.stringify({ ens: args.to, resolved: resolvedTo }));
+    printErrorJson({ ens: args.to, resolved: resolvedTo });
   }
   let tx;
   let tokenLabel = chain === "eip155:56" ? "BNB" : "ETH";
   if (args.token && args.token !== "ETH" && args.token !== "BNB") {
     const tokenAddr = getTokenAddress(args.token, chain);
     if (!tokenAddr) {
-      console.error(JSON.stringify({ error: `Token ${args.token} not supported on ${chain}` }));
+      printErrorJson({ error: `Token ${args.token} not supported on ${chain}` });
       process.exit(1);
     }
     const decimals = getTokenDecimals(args.token);
@@ -821,21 +834,19 @@ async function cmdSendTx(args) {
       }
     });
     const explorerUrl = EXPLORER_URLS[chain] || "";
-    console.log(
-      JSON.stringify({
-        status: "sent",
-        txHash,
-        chain,
-        from,
-        to: resolvedTo,
-        ...resolvedTo !== args.to ? { ens: args.to } : {},
-        amount: args.amount,
-        token: tokenLabel,
-        explorer: explorerUrl ? `${explorerUrl}${txHash}` : void 0
-      })
-    );
+    printJson({
+      status: "sent",
+      txHash,
+      chain,
+      from,
+      to: resolvedTo,
+      ...resolvedTo !== args.to ? { ens: args.to } : {},
+      amount: args.amount,
+      token: tokenLabel,
+      explorer: explorerUrl ? `${explorerUrl}${txHash}` : void 0
+    });
   } catch (err) {
-    console.log(JSON.stringify({ status: "rejected", error: err.message }));
+    printJson({ status: "rejected", error: err.message });
   }
   await client.core.relayer.transportClose().catch(() => {
   });
@@ -1081,20 +1092,18 @@ function resolveSupportedChain(chain) {
 }
 async function cmdCall(args) {
   if (!args.topic) {
-    console.error(JSON.stringify({ error: "--topic required" }));
+    printErrorJson({ error: "--topic required" });
     process.exit(1);
   }
   if (!args.to) {
-    console.error(JSON.stringify({ error: "--to (contract address) required" }));
+    printErrorJson({ error: "--to (contract address) required" });
     process.exit(1);
   }
   const evmChain = resolveSupportedChain(args.chain || "eip155:56");
   if (!evmChain) {
-    console.error(
-      JSON.stringify({
-        error: `Unsupported chain: ${args.chain}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.`
-      })
-    );
+    printErrorJson({
+      error: `Unsupported chain: ${args.chain}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.`
+    });
     process.exit(1);
   }
   const client = await getClient();
@@ -1103,11 +1112,11 @@ async function cmdCall(args) {
   const { address: from } = parseAccount(accountStr);
   const resolvedTo = await resolveAddress(args.to);
   if (resolvedTo !== args.to) {
-    console.error(JSON.stringify({ ens: args.to, resolved: resolvedTo }));
+    printErrorJson({ ens: args.to, resolved: resolvedTo });
   }
   const tx = buildCallTransaction(from, resolvedTo, args);
-  console.error(
-    JSON.stringify({
+  process.stderr.write(
+    `${stringifyJson({
       action: "sending_raw_tx",
       chain: evmChain,
       from,
@@ -1115,18 +1124,20 @@ async function cmdCall(args) {
       data: tx.data ? `${tx.data.slice(0, 10)}...` : void 0,
       value: tx.value,
       gas: tx.gas
-    })
+    })}
+`
   );
   if (!args.noSimulate) {
     const rpcCandidates = getRpcCandidatesForChain(evmChain);
-    console.error(
-      JSON.stringify({
+    process.stderr.write(
+      `${stringifyJson({
         action: "simulating_tx",
         rpcCandidates: rpcCandidates.map((candidate) => ({
           rpcUrl: candidate.rpcUrl,
           rpcSource: candidate.source
         }))
-      })
+      })}
+`
     );
     const simResult = await simulateTransaction(
       evmChain,
@@ -1134,27 +1145,26 @@ async function cmdCall(args) {
       rpcCandidates
     );
     if (!simResult.success) {
-      console.log(
-        JSON.stringify({
-          status: "simulation_failed",
-          error: simResult.error,
-          revertReason: simResult.revertReason,
-          revertData: simResult.revertData,
-          revertSelector: simResult.revertSelector,
-          attempts: simResult.attempts,
-          hint: "Transaction would revert on-chain. Use --no-simulate to force send (not recommended)."
-        })
-      );
+      printJson({
+        status: "simulation_failed",
+        error: simResult.error,
+        revertReason: simResult.revertReason,
+        revertData: simResult.revertData,
+        revertSelector: simResult.revertSelector,
+        attempts: simResult.attempts,
+        hint: "Transaction would revert on-chain. Use --no-simulate to force send (not recommended)."
+      });
       await client.core.relayer.transportClose().catch(() => {
       });
       process.exit(1);
     }
-    console.error(
-      JSON.stringify({
+    process.stderr.write(
+      `${stringifyJson({
         action: "simulation_passed",
         rpcUrl: simResult.rpcUrl,
         rpcSource: simResult.rpcSource
-      })
+      })}
+`
     );
   }
   try {
@@ -1176,21 +1186,19 @@ async function cmdCall(args) {
       }
     });
     const explorerUrl = EXPLORER_URLS2[evmChain] || "";
-    console.log(
-      JSON.stringify({
-        status: "sent",
-        txHash,
-        chain: evmChain,
-        from,
-        to: resolvedTo,
-        ...resolvedTo !== args.to ? { ens: args.to } : {},
-        data: tx.data,
-        value: tx.value,
-        explorer: explorerUrl ? `${explorerUrl}${txHash}` : void 0
-      })
-    );
+    printJson({
+      status: "sent",
+      txHash,
+      chain: evmChain,
+      from,
+      to: resolvedTo,
+      ...resolvedTo !== args.to ? { ens: args.to } : {},
+      data: tx.data,
+      value: tx.value,
+      explorer: explorerUrl ? `${explorerUrl}${txHash}` : void 0
+    });
   } catch (err) {
-    console.log(JSON.stringify({ status: "rejected", error: err.message }));
+    printJson({ status: "rejected", error: err.message });
   }
   await client.core.relayer.transportClose().catch(() => {
   });
@@ -1316,11 +1324,9 @@ async function cmdBalance(args) {
     }
   }
   if (accountsToCheck.length === 0) {
-    console.log(
-      JSON.stringify({
-        error: "No accounts found. Use --topic, --address, or ensure sessions exist."
-      })
-    );
+    printJson({
+      error: "No accounts found. Use --topic, --address, or ensure sessions exist."
+    });
     return;
   }
   const seen = /* @__PURE__ */ new Set();
@@ -1338,7 +1344,7 @@ async function cmdBalance(args) {
       results.push({ chain, address, balances: [], error: `Unsupported chain: ${chain}` });
     }
   }
-  console.log(JSON.stringify(results, null, 2));
+  printJson(results);
 }
 
 // src/commands/health.ts
@@ -1362,28 +1368,24 @@ async function cmdHealth(args) {
   if (args.all) {
     topics = Object.keys(sessions);
     if (topics.length === 0) {
-      console.log(JSON.stringify({ status: "no_sessions", message: "No sessions found" }));
+      printJson({ status: "no_sessions", message: "No sessions found" });
       process.exit(0);
     }
   } else if (args.topic) {
     if (!sessions[args.topic]) {
-      console.error(JSON.stringify({ error: "Session not found", topic: args.topic }));
+      printErrorJson({ error: "Session not found", topic: args.topic });
       process.exit(1);
     }
     topics = [args.topic];
   } else if (args.address) {
     const match = findSessionByAddress(sessions, args.address);
     if (!match) {
-      console.error(
-        JSON.stringify({ error: "No session found for address", address: args.address })
-      );
+      printErrorJson({ error: "No session found for address", address: args.address });
       process.exit(1);
     }
     topics = [match.topic];
   } else {
-    console.error(
-      JSON.stringify({ error: "--topic, --address, or --all required for health command" })
-    );
+    printErrorJson({ error: "--topic, --address, or --all required for health command" });
     process.exit(1);
   }
   const client = await getClient();
@@ -1393,7 +1395,8 @@ async function cmdHealth(args) {
     const session = sessions[topic];
     const accounts = session.accounts || [];
     const peerName = session.peerName || "unknown";
-    process.stderr.write(JSON.stringify({ pinging: topic, peer: peerName }) + "\n");
+    process.stderr.write(`${stringifyJson({ pinging: topic, peer: peerName })}
+`);
     const { alive, error } = await pingSession(client, topic);
     const shortAddresses = accounts.map((a) => {
       const parts = a.split(":");
@@ -1428,10 +1431,22 @@ async function cmdHealth(args) {
     ...args.clean && { cleaned },
     sessions: results
   };
-  console.log(JSON.stringify(output, null, 2));
+  printJson(output);
   await client.core.relayer.transportClose().catch(() => {
   });
   process.exit(0);
+}
+
+// src/chains.ts
+var CHAIN_LABELS = {
+  "eip155:1": "Ethereum",
+  "eip155:56": "BSC"
+};
+function getChainLabel(chainId) {
+  return CHAIN_LABELS[chainId] || chainId;
+}
+function formatChainDisplay(chainId) {
+  return getChainLabel(chainId);
 }
 
 // src/commands/sessions.ts
@@ -1440,9 +1455,7 @@ function resolveAddress2(args) {
     const sessions = loadSessions();
     const match = findSessionByAddress(sessions, args.address);
     if (!match) {
-      console.error(
-        JSON.stringify({ error: "No session found for address", address: args.address })
-      );
+      printErrorJson({ error: "No session found for address", address: args.address });
       process.exit(1);
     }
     args.topic = match.topic;
@@ -1452,20 +1465,20 @@ function resolveAddress2(args) {
 async function cmdStatus(args) {
   args = resolveAddress2(args);
   if (!args.topic) {
-    console.error(JSON.stringify({ error: "--topic or --address required" }));
+    printErrorJson({ error: "--topic or --address required" });
     process.exit(1);
   }
   const sessions = loadSessions();
   const session = sessions[args.topic];
   if (!session) {
-    console.log(JSON.stringify({ status: "not_found", topic: args.topic }));
+    printJson({ status: "not_found", topic: args.topic });
     return;
   }
-  console.log(JSON.stringify({ status: "active", ...session }));
+  printJson({ status: "active", ...session });
 }
 async function cmdSessions() {
   const sessions = loadSessions();
-  console.log(JSON.stringify(sessions, null, 2));
+  printJson(sessions);
 }
 async function cmdListSessions() {
   const sessions = loadSessions();
@@ -1479,7 +1492,7 @@ async function cmdListSessions() {
       const parts = a.split(":");
       const chain = parts.slice(0, 2).join(":");
       const addr = parts.slice(2).join(":");
-      return `  ${chain} -> ${addr}`;
+      return `  ${formatChainDisplay(chain)}: ${addr}`;
     });
     const auth = s.authenticated ? " authenticated" : "";
     const date = s.createdAt ? new Date(s.createdAt).toISOString().slice(0, 16) : "unknown";
@@ -1497,27 +1510,21 @@ async function cmdWhoami(args) {
   if (args.topic) {
     const session2 = sessions[args.topic];
     if (!session2) {
-      console.error(JSON.stringify({ error: "Session not found", topic: args.topic }));
+      printErrorJson({ error: "Session not found", topic: args.topic });
       process.exit(1);
     }
-    console.log(
-      JSON.stringify(
-        {
-          topic: args.topic,
-          peerName: session2.peerName,
-          accounts: session2.accounts,
-          authenticated: session2.authenticated || false,
-          createdAt: session2.createdAt
-        },
-        null,
-        2
-      )
-    );
+    printJson({
+      topic: args.topic,
+      peerName: session2.peerName,
+      accounts: session2.accounts,
+      authenticated: session2.authenticated || false,
+      createdAt: session2.createdAt
+    });
     return;
   }
   const entries = Object.entries(sessions);
   if (entries.length === 0) {
-    console.log(JSON.stringify({ error: "No sessions found" }));
+    printJson({ error: "No sessions found" });
     return;
   }
   entries.sort(
@@ -1526,35 +1533,29 @@ async function cmdWhoami(args) {
     )
   );
   const [topic, session] = entries[0];
-  console.log(
-    JSON.stringify(
-      {
-        topic,
-        peerName: session.peerName,
-        accounts: session.accounts,
-        authenticated: session.authenticated || false,
-        createdAt: session.createdAt
-      },
-      null,
-      2
-    )
-  );
+  printJson({
+    topic,
+    peerName: session.peerName,
+    accounts: session.accounts,
+    authenticated: session.authenticated || false,
+    createdAt: session.createdAt
+  });
 }
 async function cmdDeleteSession(args) {
   args = resolveAddress2(args);
   if (!args.topic) {
-    console.error(JSON.stringify({ error: "--topic or --address required" }));
+    printErrorJson({ error: "--topic or --address required" });
     process.exit(1);
   }
   const sessions = loadSessions();
   if (!sessions[args.topic]) {
-    console.log(JSON.stringify({ status: "not_found", topic: args.topic }));
+    printJson({ status: "not_found", topic: args.topic });
     return;
   }
   const { peerName, accounts } = sessions[args.topic];
   delete sessions[args.topic];
   saveSessions(sessions);
-  console.log(JSON.stringify({ status: "deleted", topic: args.topic, peerName, accounts }));
+  printJson({ status: "deleted", topic: args.topic, peerName, accounts });
 }
 
 // src/cli/router.ts
@@ -1563,9 +1564,7 @@ function resolveAddress3(args) {
     const sessions = loadSessions();
     const match = findSessionByAddress(sessions, args.address);
     if (!match) {
-      console.error(
-        JSON.stringify({ error: "No session found for address", address: args.address })
-      );
+      printErrorJson({ error: "No session found for address", address: args.address });
       process.exit(1);
     }
     args.topic = match.topic;
@@ -1576,26 +1575,18 @@ async function cmdTokens(args) {
   const chain = args.chain || "eip155:1";
   const tokens = getTokensForChain(chain);
   if (tokens.length === 0) {
-    console.log(
-      JSON.stringify({ chain, tokens: [], message: "No tokens configured for this chain" })
-    );
+    printJson({ chain, tokens: [], message: "No tokens configured for this chain" });
     return;
   }
-  console.log(
-    JSON.stringify(
-      {
-        chain,
-        tokens: tokens.map((t) => ({
-          symbol: t.symbol,
-          name: t.name,
-          decimals: t.decimals,
-          address: t.address
-        }))
-      },
-      null,
-      2
-    )
-  );
+  printJson({
+    chain,
+    tokens: tokens.map((t) => ({
+      symbol: t.symbol,
+      name: t.name,
+      decimals: t.decimals,
+      address: t.address
+    }))
+  });
 }
 async function runCommand(command, args, meta2) {
   const commands = {
@@ -1617,13 +1608,11 @@ async function runCommand(command, args, meta2) {
     "delete-session": cmdDeleteSession,
     health: cmdHealth,
     version: async () => {
-      console.log(
-        JSON.stringify({
-          skill: meta2.skillName,
-          version: meta2.skillVersion,
-          hint: "If version mismatch, run: npm install && npm run build"
-        })
-      );
+      printJson({
+        skill: meta2.skillName,
+        version: meta2.skillVersion,
+        hint: "If version mismatch, run: npm install && npm run build"
+      });
     }
   };
   if (!commands[command]) {
@@ -1633,10 +1622,122 @@ async function runCommand(command, args, meta2) {
   await commands[command](args);
 }
 
+// src/cli/debug-log.ts
+import { appendFileSync, mkdirSync as mkdirSync4 } from "fs";
+import { dirname as dirname3, resolve as resolve3 } from "path";
+function writeRecord(filePath, record) {
+  try {
+    appendFileSync(filePath, `${JSON.stringify(record)}
+`, "utf8");
+  } catch {
+  }
+}
+function toText(chunk, encoding) {
+  if (typeof chunk === "string") return chunk;
+  if (chunk instanceof Uint8Array) {
+    return Buffer.from(chunk).toString(encoding || "utf8");
+  }
+  return String(chunk);
+}
+function normalizeWriteArgs(encodingOrCb, cb) {
+  if (typeof encodingOrCb === "function") {
+    return { encoding: void 0, callback: encodingOrCb };
+  }
+  return { encoding: encodingOrCb, callback: cb };
+}
+function parseJsonIfPossible(line) {
+  try {
+    return JSON.parse(line);
+  } catch {
+    return void 0;
+  }
+}
+function isStructuredJson(value) {
+  return Array.isArray(value) || typeof value === "object" && value !== null;
+}
+function patchWriteStream(streamName, stream, filePath, skill) {
+  const originalWrite = stream.write.bind(stream);
+  let buffer = "";
+  const emitLine = (line) => {
+    if (!line) return;
+    const parsed2 = parseJsonIfPossible(line);
+    const record = {
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      pid: process.pid,
+      skill,
+      stream: streamName,
+      line
+    };
+    if (isStructuredJson(parsed2)) {
+      record.json = parsed2;
+    }
+    writeRecord(filePath, record);
+  };
+  const flushBuffer = () => {
+    if (!buffer) return;
+    emitLine(buffer.replace(/\r$/, ""));
+    buffer = "";
+  };
+  stream.write = ((chunk, encodingOrCb, cb) => {
+    const { encoding, callback } = normalizeWriteArgs(encodingOrCb, cb);
+    const text = toText(chunk, encoding);
+    buffer += text;
+    let index = buffer.indexOf("\n");
+    while (index >= 0) {
+      const line = buffer.slice(0, index).replace(/\r$/, "");
+      emitLine(line);
+      buffer = buffer.slice(index + 1);
+      index = buffer.indexOf("\n");
+    }
+    if (encoding !== void 0 && callback) {
+      return originalWrite(chunk, encoding, callback);
+    }
+    if (encoding !== void 0) {
+      return originalWrite(chunk, encoding);
+    }
+    if (callback) {
+      return originalWrite(chunk, callback);
+    }
+    return originalWrite(chunk);
+  });
+  return flushBuffer;
+}
+function setupDebugLogFile(skill, cliLogFile) {
+  const requested = cliLogFile || process.env.SKILL_DEBUG_LOG_FILE || process.env.DEBUG_LOG_FILE;
+  if (!requested) return null;
+  const filePath = resolve3(requested);
+  try {
+    mkdirSync4(dirname3(filePath), { recursive: true });
+  } catch {
+  }
+  process.env.SKILL_DEBUG_LOG_FILE = filePath;
+  const flushStdout = patchWriteStream("stdout", process.stdout, filePath, skill);
+  const flushStderr = patchWriteStream("stderr", process.stderr, filePath, skill);
+  const flushAll = () => {
+    flushStdout();
+    flushStderr();
+  };
+  process.on("beforeExit", flushAll);
+  process.on("exit", flushAll);
+  writeRecord(filePath, {
+    ts: (/* @__PURE__ */ new Date()).toISOString(),
+    pid: process.pid,
+    skill,
+    stream: "stderr",
+    line: "debug_log_enabled",
+    config: {
+      filePath,
+      argv: process.argv.slice(2)
+    }
+  });
+  return filePath;
+}
+
 // src/cli.ts
+var parsed = parseCliInput();
+setupDebugLogFile("@lista-dao/lista-wallet-connect-skill", parsed.debugLogFile);
 loadLocalEnv();
 var meta = loadCliMeta();
-var parsed = parseCliInput();
 var SKILL_VERSION = meta.skillVersion;
 var SKILL_NAME = meta.skillName;
 if (!parsed.command || parsed.help) {
@@ -1644,7 +1745,7 @@ if (!parsed.command || parsed.help) {
   process.exit(0);
 }
 runCommand(parsed.command, parsed.args, meta).catch((err) => {
-  console.error(JSON.stringify({ error: err.message }));
+  printErrorJson({ error: err.message });
   process.exit(1);
 });
 export {

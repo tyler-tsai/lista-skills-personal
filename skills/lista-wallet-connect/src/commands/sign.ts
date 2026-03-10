@@ -11,11 +11,12 @@ import {
   encodeEvmMessage,
   requestWithTimeout,
 } from "../helpers.js";
+import { printErrorJson, printJson } from "../output.js";
 import type { ParsedArgs } from "../types.js";
 
 export async function cmdSign(args: ParsedArgs): Promise<void> {
   if (!args.topic || !args.message) {
-    console.error(JSON.stringify({ error: "--topic and --message required" }));
+    printErrorJson({ error: "--topic and --message required" });
     process.exit(1);
   }
 
@@ -29,7 +30,7 @@ export async function cmdSign(args: ParsedArgs): Promise<void> {
   );
 
   if (!account) {
-    console.error(JSON.stringify({ error: "No EVM account found", chainHint }));
+    printErrorJson({ error: "No EVM account found", chainHint });
     process.exit(1);
   }
 
@@ -54,7 +55,7 @@ export async function cmdSign(args: ParsedArgs): Promise<void> {
 
   const result = { status: "signed", address, signature, chain: chainId };
 
-  console.log(JSON.stringify(result));
+  printJson(result);
   await client.core.relayer.transportClose().catch(() => {});
   process.exit(0);
 }

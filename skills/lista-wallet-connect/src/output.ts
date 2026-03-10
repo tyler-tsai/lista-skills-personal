@@ -9,7 +9,3 @@ export function printJson(payload: unknown): void {
 export function printErrorJson(payload: unknown): void {
   console.error(stringifyJson(payload));
 }
-
-export function exitWithCode(code: number): never {
-  process.exit(code);
-}

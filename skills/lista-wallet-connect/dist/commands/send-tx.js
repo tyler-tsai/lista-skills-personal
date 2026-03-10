@@ -5,18 +5,21 @@ import { getClient } from "../client.js";
 import { loadSessions } from "../storage.js";
 import { requireSession, requireAccount, parseAccount, resolveAddress, requestWithTimeout, } from "../helpers.js";
 import { getTokenAddress, getTokenDecimals } from "./tokens.js";
+import { printErrorJson, printJson } from "../output.js";
 const EXPLORER_URLS = {
     "eip155:1": "https://etherscan.io/tx/",
     "eip155:56": "https://bscscan.com/tx/",
 };
 export async function cmdSendTx(args) {
     if (!args.topic) {
-        console.error(JSON.stringify({ error: "--topic required" }));
+        printErrorJson({ error: "--topic required" });
         process.exit(1);
     }
     const chain = args.chain || "eip155:1";
     if (chain !== "eip155:1" && chain !== "eip155:56") {
-        console.error(JSON.stringify({ error: `Unsupported chain: ${chain}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.` }));
+        printErrorJson({
+            error: `Unsupported chain: ${chain}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.`,
+        });
         process.exit(1);
     }
     const client = await getClient();
@@ -25,14 +28,14 @@ export async function cmdSendTx(args) {
     const { address: from } = parseAccount(accountStr);
     const resolvedTo = await resolveAddress(args.to);
     if (resolvedTo !== args.to) {
-        console.error(JSON.stringify({ ens: args.to, resolved: resolvedTo }));
+        printErrorJson({ ens: args.to, resolved: resolvedTo });
     }
     let tx;
     let tokenLabel = chain === "eip155:56" ? "BNB" : "ETH";
     if (args.token && args.token !== "ETH" && args.token !== "BNB") {
         const tokenAddr = getTokenAddress(args.token, chain);
         if (!tokenAddr) {
-            console.error(JSON.stringify({ error: `Token ${args.token} not supported on ${chain}` }));
+            printErrorJson({ error: `Token ${args.token} not supported on ${chain}` });
             process.exit(1);
         }
         const decimals = getTokenDecimals(args.token);
@@ -72,7 +75,7 @@ export async function cmdSendTx(args) {
             },
         });
         const explorerUrl = EXPLORER_URLS[chain] || "";
-        console.log(JSON.stringify({
+        printJson({
             status: "sent",
             txHash,
             chain,
@@ -82,10 +85,10 @@ export async function cmdSendTx(args) {
             amount: args.amount,
             token: tokenLabel,
             explorer: explorerUrl ? `${explorerUrl}${txHash}` : undefined,
-        }));
+        });
     }
     catch (err) {
-        console.log(JSON.stringify({ status: "rejected", error: err.message }));
+        printJson({ status: "rejected", error: err.message });
     }
     await client.core.relayer.transportClose().catch(() => { });
     process.exit(0);

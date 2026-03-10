@@ -5,6 +5,7 @@
 import { fetchMarkets } from "../api.js";
 import { SUPPORTED_CHAINS } from "../config.js";
 import { setLastFilters } from "../context.js";
+import { printJson } from "./shared/output.js";
 import { isPositiveInteger, isSupportedChain, isValidOrder, } from "../utils/validators.js";
 // Zone constants
 const ZONE_SMART_LENDING = 3;
@@ -24,31 +25,31 @@ function formatUsd(value) {
 export async function cmdMarkets(args) {
     const chain = args.chain || "eip155:56";
     if (!isSupportedChain(chain, SUPPORTED_CHAINS)) {
-        console.log(JSON.stringify({
+        printJson({
             status: "error",
             reason: `Unsupported chain: ${chain}. Supported: ${SUPPORTED_CHAINS.join(", ")}`,
-        }));
+        });
         process.exit(1);
     }
     if (args.page !== undefined && !isPositiveInteger(args.page)) {
-        console.log(JSON.stringify({
+        printJson({
             status: "error",
             reason: "--page must be a positive integer",
-        }));
+        });
         process.exit(1);
     }
     if (args.pageSize !== undefined && !isPositiveInteger(args.pageSize)) {
-        console.log(JSON.stringify({
+        printJson({
             status: "error",
             reason: "--page-size must be a positive integer",
-        }));
+        });
         process.exit(1);
     }
     if (args.order && !isValidOrder(args.order)) {
-        console.log(JSON.stringify({
+        printJson({
             status: "error",
             reason: "--order must be asc or desc",
-        }));
+        });
         process.exit(1);
     }
     try {
@@ -82,17 +83,17 @@ export async function cmdMarkets(args) {
             },
         });
         if (filteredMarkets.length === 0) {
-            console.log(JSON.stringify({
+            printJson({
                 status: "success",
                 chain,
                 markets: [],
                 message: "No markets found",
                 note: MARKET_OPERATION_LIMITATION_NOTE,
-            }));
+            });
             return;
         }
         // Output JSON for agent parsing
-        console.log(JSON.stringify({
+        printJson({
             status: "success",
             chain,
             count: filteredMarkets.length,
@@ -122,14 +123,14 @@ export async function cmdMarkets(args) {
                 vaults: m.vaults?.map((v) => v.name).join(", "),
                 display: `[${i}] ${m.collateral}/${m.loan} - LLTV: ${(Number.parseFloat(m.lltv) * 100).toFixed(1)}%, Liquidity: $${formatUsd(m.liquidityUsd)}`,
             })),
-        }));
+        });
     }
     catch (err) {
-        console.log(JSON.stringify({
+        printJson({
             status: "error",
             reason: "sdk_error",
             message: err.message,
-        }));
+        });
         process.exit(1);
     }
 }

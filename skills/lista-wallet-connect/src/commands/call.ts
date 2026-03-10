@@ -15,6 +15,7 @@ import {
   resolveAddress,
   requestWithTimeout,
 } from "../helpers.js";
+import { printErrorJson, printJson, stringifyJson } from "../output.js";
 import type { ParsedArgs } from "../types.js";
 import { EXPLORER_URLS } from "./call/constants.js";
 import { buildCallTransaction } from "./call/parse.js";
@@ -29,21 +30,19 @@ function resolveSupportedChain(chain: string): SupportedEvmChainId | null {
 
 export async function cmdCall(args: ParsedArgs): Promise<void> {
   if (!args.topic) {
-    console.error(JSON.stringify({ error: "--topic required" }));
+    printErrorJson({ error: "--topic required" });
     process.exit(1);
   }
   if (!args.to) {
-    console.error(JSON.stringify({ error: "--to (contract address) required" }));
+    printErrorJson({ error: "--to (contract address) required" });
     process.exit(1);
   }
 
   const evmChain = resolveSupportedChain(args.chain || "eip155:56");
   if (!evmChain) {
-    console.error(
-      JSON.stringify({
-        error: `Unsupported chain: ${args.chain}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.`,
-      })
-    );
+    printErrorJson({
+      error: `Unsupported chain: ${args.chain}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.`,
+    });
     process.exit(1);
   }
 
@@ -54,13 +53,13 @@ export async function cmdCall(args: ParsedArgs): Promise<void> {
 
   const resolvedTo = await resolveAddress(args.to);
   if (resolvedTo !== args.to) {
-    console.error(JSON.stringify({ ens: args.to, resolved: resolvedTo }));
+    printErrorJson({ ens: args.to, resolved: resolvedTo });
   }
 
   const tx = buildCallTransaction(from, resolvedTo, args);
 
-  console.error(
-    JSON.stringify({
+  process.stderr.write(
+    `${stringifyJson({
       action: "sending_raw_tx",
       chain: evmChain,
       from,
@@ -68,19 +67,19 @@ export async function cmdCall(args: ParsedArgs): Promise<void> {
       data: tx.data ? `${tx.data.slice(0, 10)}...` : undefined,
       value: tx.value,
       gas: tx.gas,
-    })
+    })}\n`,
   );
 
   if (!args.noSimulate) {
     const rpcCandidates = getRpcCandidatesForChain(evmChain);
-    console.error(
-      JSON.stringify({
+    process.stderr.write(
+      `${stringifyJson({
         action: "simulating_tx",
         rpcCandidates: rpcCandidates.map((candidate) => ({
           rpcUrl: candidate.rpcUrl,
           rpcSource: candidate.source,
         })),
-      })
+      })}\n`,
     );
 
     const simResult = await simulateTransaction(
@@ -89,27 +88,25 @@ export async function cmdCall(args: ParsedArgs): Promise<void> {
       rpcCandidates
     );
     if (!simResult.success) {
-      console.log(
-        JSON.stringify({
-          status: "simulation_failed",
-          error: simResult.error,
-          revertReason: simResult.revertReason,
-          revertData: simResult.revertData,
-          revertSelector: simResult.revertSelector,
-          attempts: simResult.attempts,
-          hint: "Transaction would revert on-chain. Use --no-simulate to force send (not recommended).",
-        })
-      );
+      printJson({
+        status: "simulation_failed",
+        error: simResult.error,
+        revertReason: simResult.revertReason,
+        revertData: simResult.revertData,
+        revertSelector: simResult.revertSelector,
+        attempts: simResult.attempts,
+        hint: "Transaction would revert on-chain. Use --no-simulate to force send (not recommended).",
+      });
       await client.core.relayer.transportClose().catch(() => {});
       process.exit(1);
     }
 
-    console.error(
-      JSON.stringify({
+    process.stderr.write(
+      `${stringifyJson({
         action: "simulation_passed",
         rpcUrl: simResult.rpcUrl,
         rpcSource: simResult.rpcSource,
-      })
+      })}\n`,
     );
   }
 
@@ -132,21 +129,19 @@ export async function cmdCall(args: ParsedArgs): Promise<void> {
       },
     });
     const explorerUrl = EXPLORER_URLS[evmChain] || "";
-    console.log(
-      JSON.stringify({
-        status: "sent",
-        txHash,
-        chain: evmChain,
-        from,
-        to: resolvedTo,
-        ...(resolvedTo !== args.to ? { ens: args.to } : {}),
-        data: tx.data,
-        value: tx.value,
-        explorer: explorerUrl ? `${explorerUrl}${txHash}` : undefined,
-      })
-    );
+    printJson({
+      status: "sent",
+      txHash,
+      chain: evmChain,
+      from,
+      to: resolvedTo,
+      ...(resolvedTo !== args.to ? { ens: args.to } : {}),
+      data: tx.data,
+      value: tx.value,
+      explorer: explorerUrl ? `${explorerUrl}${txHash}` : undefined,
+    });
   } catch (err) {
-    console.log(JSON.stringify({ status: "rejected", error: (err as Error).message }));
+    printJson({ status: "rejected", error: (err as Error).message });
   }
 
   await client.core.relayer.transportClose().catch(() => {});

@@ -28,6 +28,7 @@ Options:
   --clean            (health) Remove dead sessions from storage
   --open             (pair) Force open QR in system viewer (for agent environments)
   --no-simulate      (call) Skip transaction simulation (not recommended)
+  --debug-log-file <path>  Append structured stdout/stderr logs to a file (jsonl)
 
 Supported Chains:
   eip155:1      Ethereum Mainnet

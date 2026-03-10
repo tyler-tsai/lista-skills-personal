@@ -9,6 +9,7 @@ import { execSync } from "child_process";
 import { parseAccountId, parseChainId } from "@walletconnect/utils";
 import { getClient } from "../client.js";
 import { saveSession, SESSIONS_DIR } from "../storage.js";
+import { printErrorJson, printJson } from "../output.js";
 import type { ParsedArgs } from "../types.js";
 
 /**
@@ -114,7 +115,9 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
   for (const chain of chains) {
     const { namespace } = parseChainId(chain);
     if (!NAMESPACE_CONFIG[namespace]) {
-      console.error(JSON.stringify({ error: `Unsupported namespace: ${namespace}. Only EVM (eip155) is supported.` }));
+      printErrorJson({
+        error: `Unsupported namespace: ${namespace}. Only EVM (eip155) is supported.`,
+      });
       process.exit(1);
     }
     if (!byNamespace[namespace]) byNamespace[namespace] = [];
@@ -201,7 +204,7 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
     output.openFailed = true;
   }
 
-  console.log(JSON.stringify(output));
+  printJson(output);
 
   try {
     const session = await approval();
@@ -217,28 +220,26 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
       createdAt: pairedAt,
     });
 
-    console.log(
-      JSON.stringify({
-        status: "paired",
-        message: `Wallet connected successfully (${walletName}).`,
-        topic: session.topic,
-        accounts,
-        peerName: walletName,
-        pairedAt,
-        summary: {
-          chainCount: summary.chains.length,
-          accountCount: accounts.length,
-          chains: summary.chains,
-          primaryAccount: summary.primaryAccount,
-        },
-        nextActions: [
-          "Use whoami/status to verify the active session.",
-          "Use auth if a consent signature is required before operations.",
-        ],
-      }),
-    );
+    printJson({
+      status: "paired",
+      message: `Wallet connected successfully (${walletName}).`,
+      topic: session.topic,
+      accounts,
+      peerName: walletName,
+      pairedAt,
+      summary: {
+        chainCount: summary.chains.length,
+        accountCount: accounts.length,
+        chains: summary.chains,
+        primaryAccount: summary.primaryAccount,
+      },
+      nextActions: [
+        "Use whoami/status to verify the active session.",
+        "Use auth if a consent signature is required before operations.",
+      ],
+    });
   } catch (err) {
-    console.log(JSON.stringify({ status: "rejected", error: (err as Error).message }));
+    printJson({ status: "rejected", error: (err as Error).message });
   }
 
   await client.core.relayer.transportClose().catch(() => {});

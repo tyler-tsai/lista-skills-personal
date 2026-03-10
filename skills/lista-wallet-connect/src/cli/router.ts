@@ -16,6 +16,7 @@ import {
 import { getTokensForChain } from "../commands/tokens.js";
 import { loadSessions } from "../storage.js";
 import { findSessionByAddress } from "../client.js";
+import { printErrorJson, printJson } from "../output.js";
 import type { ParsedArgs } from "../types.js";
 import type { CliMeta } from "./meta.js";
 
@@ -24,9 +25,7 @@ function resolveAddress(args: ParsedArgs): ParsedArgs {
     const sessions = loadSessions();
     const match = findSessionByAddress(sessions, args.address);
     if (!match) {
-      console.error(
-        JSON.stringify({ error: "No session found for address", address: args.address })
-      );
+      printErrorJson({ error: "No session found for address", address: args.address });
       process.exit(1);
     }
     args.topic = match.topic;
@@ -38,27 +37,19 @@ async function cmdTokens(args: ParsedArgs): Promise<void> {
   const chain = args.chain || "eip155:1";
   const tokens = getTokensForChain(chain);
   if (tokens.length === 0) {
-    console.log(
-      JSON.stringify({ chain, tokens: [], message: "No tokens configured for this chain" })
-    );
+    printJson({ chain, tokens: [], message: "No tokens configured for this chain" });
     return;
   }
 
-  console.log(
-    JSON.stringify(
-      {
-        chain,
-        tokens: tokens.map((t) => ({
-          symbol: t.symbol,
-          name: t.name,
-          decimals: t.decimals,
-          address: t.address,
-        })),
-      },
-      null,
-      2
-    )
-  );
+  printJson({
+    chain,
+    tokens: tokens.map((t) => ({
+      symbol: t.symbol,
+      name: t.name,
+      decimals: t.decimals,
+      address: t.address,
+    })),
+  });
 }
 
 export async function runCommand(
@@ -85,13 +76,11 @@ export async function runCommand(
     "delete-session": cmdDeleteSession,
     health: cmdHealth,
     version: async () => {
-      console.log(
-        JSON.stringify({
-          skill: meta.skillName,
-          version: meta.skillVersion,
-          hint: "If version mismatch, run: npm install && npm run build",
-        })
-      );
+      printJson({
+        skill: meta.skillName,
+        version: meta.skillVersion,
+        hint: "If version mismatch, run: npm install && npm run build",
+      });
     },
   };
 

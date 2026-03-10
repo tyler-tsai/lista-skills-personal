@@ -5,9 +5,10 @@ import { randomBytes } from "crypto";
 import { getClient } from "../client.js";
 import { loadSessions, saveSession } from "../storage.js";
 import { requireSession, requireAccount, parseAccount, redactAddress, encodeEvmMessage, requestWithTimeout, } from "../helpers.js";
+import { printErrorJson, printJson } from "../output.js";
 export async function cmdAuth(args) {
     if (!args.topic) {
-        console.error(JSON.stringify({ error: "--topic required" }));
+        printErrorJson({ error: "--topic required" });
         process.exit(1);
     }
     const client = await getClient();
@@ -51,16 +52,16 @@ export async function cmdAuth(args) {
             authSignature: signature,
             authTimestamp: timestamp,
         });
-        console.log(JSON.stringify({
+        printJson({
             status: "authenticated",
             address: display,
             signature,
             nonce,
             message,
-        }));
+        });
     }
     catch (err) {
-        console.log(JSON.stringify({ status: "rejected", error: err.message }));
+        printJson({ status: "rejected", error: err.message });
     }
     await client.core.relayer.transportClose().catch(() => { });
     process.exit(0);

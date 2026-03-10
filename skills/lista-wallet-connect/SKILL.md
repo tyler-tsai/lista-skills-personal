@@ -83,6 +83,9 @@ You can override it by exporting `WALLETCONNECT_PROJECT_ID` in your shell.
 - `stdout`: JSON payloads for automation/agent parsing
 - `stderr`: progress/diagnostic logs
 - Wallet-request commands emit one `waiting_for_approval` event first, then a terminal status (`paired`/`authenticated`/`signed`/`sent`/`rejected`/`simulation_failed`/`error`).
+- Optional debug mode: add `--debug-log-file <path>` to append structured `stdout/stderr` logs (jsonl).
+- Keep CLI/runtime JSON and debug logs in raw format (for example `eip155:1`, `eip155:56`) for stable machine parsing and troubleshooting.
+- For user-facing answers, the agent should map chain IDs to names (`eip155:1` -> `Ethereum`, `eip155:56` -> `BSC`) in rendered text/tables.
 - Treat raw JSON payloads as internal contract data; only show raw output to users on explicit request.
 
 ### OpenClaw Streaming Rules (Required)

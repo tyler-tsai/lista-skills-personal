@@ -19,12 +19,14 @@ export function parseCliInput() {
             clean: { type: "boolean" },
             open: { type: "boolean" },
             "no-simulate": { type: "boolean" },
+            "debug-log-file": { type: "string" },
             help: { type: "boolean", short: "h" },
         },
     });
     return {
         command: positionals[0],
         help: Boolean(values.help),
+        debugLogFile: values["debug-log-file"],
         args: {
             ...values,
             noSimulate: values["no-simulate"],

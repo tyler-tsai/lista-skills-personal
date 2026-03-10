@@ -7,6 +7,3 @@ export function printJson(payload) {
 export function printErrorJson(payload) {
     console.error(stringifyJson(payload));
 }
-export function exitWithCode(code) {
-    process.exit(code);
-}

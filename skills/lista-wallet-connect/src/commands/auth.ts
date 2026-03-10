@@ -13,11 +13,12 @@ import {
   encodeEvmMessage,
   requestWithTimeout,
 } from "../helpers.js";
+import { printErrorJson, printJson } from "../output.js";
 import type { ParsedArgs } from "../types.js";
 
 export async function cmdAuth(args: ParsedArgs): Promise<void> {
   if (!args.topic) {
-    console.error(JSON.stringify({ error: "--topic required" }));
+    printErrorJson({ error: "--topic required" });
     process.exit(1);
   }
 
@@ -67,17 +68,15 @@ export async function cmdAuth(args: ParsedArgs): Promise<void> {
       authTimestamp: timestamp,
     });
 
-    console.log(
-      JSON.stringify({
-        status: "authenticated",
-        address: display,
-        signature,
-        nonce,
-        message,
-      }),
-    );
+    printJson({
+      status: "authenticated",
+      address: display,
+      signature,
+      nonce,
+      message,
+    });
   } catch (err) {
-    console.log(JSON.stringify({ status: "rejected", error: (err as Error).message }));
+    printJson({ status: "rejected", error: (err as Error).message });
   }
 
   await client.core.relayer.transportClose().catch(() => {});

@@ -13,6 +13,7 @@ import {
   type SupportedEvmChainId,
 } from "../rpc.js";
 import { getTokensForChain } from "./tokens.js";
+import { printJson } from "../output.js";
 import type { ParsedArgs, BalanceResult } from "../types.js";
 
 const EVM_CHAINS: Record<SupportedEvmChainId, { chain: Chain; native: string }> = {
@@ -150,11 +151,9 @@ export async function cmdBalance(args: ParsedArgs): Promise<void> {
   }
 
   if (accountsToCheck.length === 0) {
-    console.log(
-      JSON.stringify({
-        error: "No accounts found. Use --topic, --address, or ensure sessions exist.",
-      }),
-    );
+    printJson({
+      error: "No accounts found. Use --topic, --address, or ensure sessions exist.",
+    });
     return;
   }
 
@@ -175,5 +174,5 @@ export async function cmdBalance(args: ParsedArgs): Promise<void> {
     }
   }
 
-  console.log(JSON.stringify(results, null, 2));
+  printJson(results);
 }

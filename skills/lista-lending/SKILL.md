@@ -190,6 +190,7 @@ node dist/cli/cli.bundle.mjs <command> [options]
 
 - `stdout`: machine-readable JSON (result payload)
 - `stderr`: errors only
+- Optional debug mode: add `--debug-log-file <path>` to append structured `stdout/stderr` logs (jsonl).
 
 ## Agent Display Guidelines
 
@@ -217,6 +218,8 @@ Return raw JSON only when the user explicitly asks for raw output.
 Default rule:
 
 - Use different table layouts for different commands (`vaults`, `markets`, `holdings`); do not reuse holdings layout for vault/market list pages.
+- Keep CLI/runtime JSON and debug logs in raw format (for example `eip155:56`, `eip155:1`) for stable machine parsing and debugging.
+- For user-facing text/tables, map chain IDs to names (`eip155:1` -> `Ethereum`, `eip155:56` -> `BSC`).
 - Do **not** show `zone/termType` in user-facing table unless user explicitly asks for technical details.
 - Do **not** paste full raw payloads (JSON/RPC internals) in normal user-facing replies.
 - Derive `Reason` from flags:

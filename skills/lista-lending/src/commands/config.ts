@@ -10,6 +10,7 @@ import {
   DEFAULT_RPCS,
   SUPPORTED_CHAINS,
 } from "../config.js";
+import { printJson } from "./shared/output.js";
 
 export interface ConfigArgs {
   show?: boolean;
@@ -39,53 +40,39 @@ export async function cmdConfig(args: ConfigArgs): Promise<void> {
       };
     }
 
-    console.log(
-      JSON.stringify(
-        {
-          defaultChain: config.defaultChain,
-          supportedChains: SUPPORTED_CHAINS,
-          rpcUrls: rpcStatus,
-          configFile: "~/.agent-wallet/lending-config.json",
-        },
-        null,
-        2
-      )
-    );
+    printJson({
+      defaultChain: config.defaultChain,
+      supportedChains: SUPPORTED_CHAINS,
+      rpcUrls: rpcStatus,
+      configFile: "~/.agent-wallet/lending-config.json",
+    });
     return;
   }
 
   // Set custom RPC
   if (args.setRpc) {
     if (!args.chain) {
-      console.log(
-        JSON.stringify({ status: "error", reason: "--chain required" })
-      );
+      printJson({ status: "error", reason: "--chain required" });
       process.exit(1);
     }
     if (!args.url) {
-      console.log(
-        JSON.stringify({ status: "error", reason: "--url required" })
-      );
+      printJson({ status: "error", reason: "--url required" });
       process.exit(1);
     }
 
     try {
       setRpcUrl(args.chain, args.url);
-      console.log(
-        JSON.stringify({
-          status: "success",
-          action: "set_rpc",
-          chain: args.chain,
-          url: args.url,
-        })
-      );
+      printJson({
+        status: "success",
+        action: "set_rpc",
+        chain: args.chain,
+        url: args.url,
+      });
     } catch (err) {
-      console.log(
-        JSON.stringify({
-          status: "error",
-          reason: (err as Error).message,
-        })
-      );
+      printJson({
+        status: "error",
+        reason: (err as Error).message,
+      });
       process.exit(1);
     }
     return;
@@ -94,30 +81,24 @@ export async function cmdConfig(args: ConfigArgs): Promise<void> {
   // Clear custom RPC (revert to default)
   if (args.clearRpc) {
     if (!args.chain) {
-      console.log(
-        JSON.stringify({ status: "error", reason: "--chain required" })
-      );
+      printJson({ status: "error", reason: "--chain required" });
       process.exit(1);
     }
 
     try {
       clearRpcUrl(args.chain);
       const defaultUrl = getRpcUrl(args.chain);
-      console.log(
-        JSON.stringify({
-          status: "success",
-          action: "clear_rpc",
-          chain: args.chain,
-          revertedTo: defaultUrl,
-        })
-      );
+      printJson({
+        status: "success",
+        action: "clear_rpc",
+        chain: args.chain,
+        revertedTo: defaultUrl,
+      });
     } catch (err) {
-      console.log(
-        JSON.stringify({
-          status: "error",
-          reason: (err as Error).message,
-        })
-      );
+      printJson({
+        status: "error",
+        reason: (err as Error).message,
+      });
       process.exit(1);
     }
     return;

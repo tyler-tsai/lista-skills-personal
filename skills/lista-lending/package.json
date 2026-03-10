@@ -8,7 +8,8 @@
   "type": "module",
   "main": "dist/cli/cli.bundle.mjs",
   "scripts": {
-    "build": "tsc && npm run build:bundle",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{ recursive: true, force: true })\"",
+    "build": "npm run clean && tsc && npm run build:bundle",
     "build:bundle": "esbuild src/cli.ts --bundle --packages=external --platform=node --format=esm --target=node18 --outfile=dist/cli/cli.bundle.mjs",
     "dev": "tsx src/cli.ts",
     "start": "node dist/cli/cli.bundle.mjs",

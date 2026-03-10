@@ -4,6 +4,8 @@
 
 import { loadSessions, saveSessions } from "../storage.js";
 import { findSessionByAddress } from "../client.js";
+import { formatChainDisplay } from "../chains.js";
+import { printErrorJson, printJson } from "../output.js";
 import type { ParsedArgs } from "../types.js";
 
 function resolveAddress(args: ParsedArgs): ParsedArgs {
@@ -11,9 +13,7 @@ function resolveAddress(args: ParsedArgs): ParsedArgs {
     const sessions = loadSessions();
     const match = findSessionByAddress(sessions, args.address);
     if (!match) {
-      console.error(
-        JSON.stringify({ error: "No session found for address", address: args.address }),
-      );
+      printErrorJson({ error: "No session found for address", address: args.address });
       process.exit(1);
     }
     args.topic = match.topic;
@@ -24,21 +24,21 @@ function resolveAddress(args: ParsedArgs): ParsedArgs {
 export async function cmdStatus(args: ParsedArgs): Promise<void> {
   args = resolveAddress(args);
   if (!args.topic) {
-    console.error(JSON.stringify({ error: "--topic or --address required" }));
+    printErrorJson({ error: "--topic or --address required" });
     process.exit(1);
   }
   const sessions = loadSessions();
   const session = sessions[args.topic];
   if (!session) {
-    console.log(JSON.stringify({ status: "not_found", topic: args.topic }));
+    printJson({ status: "not_found", topic: args.topic });
     return;
   }
-  console.log(JSON.stringify({ status: "active", ...session }));
+  printJson({ status: "active", ...session });
 }
 
 export async function cmdSessions(): Promise<void> {
   const sessions = loadSessions();
-  console.log(JSON.stringify(sessions, null, 2));
+  printJson(sessions);
 }
 
 export async function cmdListSessions(): Promise<void> {
@@ -53,7 +53,7 @@ export async function cmdListSessions(): Promise<void> {
       const parts = a.split(":");
       const chain = parts.slice(0, 2).join(":");
       const addr = parts.slice(2).join(":");
-      return `  ${chain} -> ${addr}`;
+      return `  ${formatChainDisplay(chain)}: ${addr}`;
     });
     const auth = s.authenticated ? " authenticated" : "";
     const date = s.createdAt ? new Date(s.createdAt).toISOString().slice(0, 16) : "unknown";
@@ -73,28 +73,22 @@ export async function cmdWhoami(args: ParsedArgs): Promise<void> {
   if (args.topic) {
     const session = sessions[args.topic];
     if (!session) {
-      console.error(JSON.stringify({ error: "Session not found", topic: args.topic }));
+      printErrorJson({ error: "Session not found", topic: args.topic });
       process.exit(1);
     }
-    console.log(
-      JSON.stringify(
-        {
-          topic: args.topic,
-          peerName: session.peerName,
-          accounts: session.accounts,
-          authenticated: session.authenticated || false,
-          createdAt: session.createdAt,
-        },
-        null,
-        2,
-      ),
-    );
+    printJson({
+      topic: args.topic,
+      peerName: session.peerName,
+      accounts: session.accounts,
+      authenticated: session.authenticated || false,
+      createdAt: session.createdAt,
+    });
     return;
   }
 
   const entries = Object.entries(sessions);
   if (entries.length === 0) {
-    console.log(JSON.stringify({ error: "No sessions found" }));
+    printJson({ error: "No sessions found" });
     return;
   }
   entries.sort((a, b) =>
@@ -103,34 +97,28 @@ export async function cmdWhoami(args: ParsedArgs): Promise<void> {
     ),
   );
   const [topic, session] = entries[0];
-  console.log(
-    JSON.stringify(
-      {
-        topic,
-        peerName: session.peerName,
-        accounts: session.accounts,
-        authenticated: session.authenticated || false,
-        createdAt: session.createdAt,
-      },
-      null,
-      2,
-    ),
-  );
+  printJson({
+    topic,
+    peerName: session.peerName,
+    accounts: session.accounts,
+    authenticated: session.authenticated || false,
+    createdAt: session.createdAt,
+  });
 }
 
 export async function cmdDeleteSession(args: ParsedArgs): Promise<void> {
   args = resolveAddress(args);
   if (!args.topic) {
-    console.error(JSON.stringify({ error: "--topic or --address required" }));
+    printErrorJson({ error: "--topic or --address required" });
     process.exit(1);
   }
   const sessions = loadSessions();
   if (!sessions[args.topic]) {
-    console.log(JSON.stringify({ status: "not_found", topic: args.topic }));
+    printJson({ status: "not_found", topic: args.topic });
     return;
   }
   const { peerName, accounts } = sessions[args.topic];
   delete sessions[args.topic];
   saveSessions(sessions);
-  console.log(JSON.stringify({ status: "deleted", topic: args.topic, peerName, accounts }));
+  printJson({ status: "deleted", topic: args.topic, peerName, accounts });
 }

@@ -7,6 +7,7 @@ import type { VaultsArgs } from "../commands/vaults.js";
 export interface ParsedCliInput {
     command: string | undefined;
     help: boolean;
+    debugLogFile?: string;
     args: ParsedArgs;
     configArgs: ConfigArgs;
     vaultsArgs: VaultsArgs;

@@ -3,30 +3,31 @@
  */
 import { fetchMarketPositions, fetchUserPositions, fetchVaultPositions } from "../api.js";
 import { loadContext, setLastFilters } from "../context.js";
+import { printJson } from "./shared/output.js";
 import { isValidAddress } from "../utils/validators.js";
 export async function cmdHoldings(args) {
     const ctx = loadContext();
     const address = args.address || ctx.userAddress;
     const scope = args.scope || "all";
     if (!address) {
-        console.log(JSON.stringify({
+        printJson({
             status: "error",
             reason: "--address required (or select a wallet first)",
-        }));
+        });
         process.exit(1);
     }
     if (!isValidAddress(address)) {
-        console.log(JSON.stringify({
+        printJson({
             status: "error",
             reason: `Invalid address: ${address}`,
-        }));
+        });
         process.exit(1);
     }
     if (!["all", "vault", "market", "selected"].includes(scope)) {
-        console.log(JSON.stringify({
+        printJson({
             status: "error",
             reason: "--scope must be all, vault, market, or selected",
-        }));
+        });
         process.exit(1);
     }
     try {
@@ -45,10 +46,10 @@ export async function cmdHoldings(args) {
         }
         else {
             if (!ctx.selectedVault && !ctx.selectedMarket) {
-                console.log(JSON.stringify({
+                printJson({
                     status: "error",
                     reason: "No selected position. Use select first or query --scope all",
-                }));
+                });
                 process.exit(1);
             }
             const [vaultData, marketData] = await Promise.all([
@@ -100,7 +101,7 @@ export async function cmdHoldings(args) {
             marketErrors: markets.filter((item) => Boolean(item.error)).length,
         };
         if (count === 0) {
-            console.log(JSON.stringify({
+            printJson({
                 status: "success",
                 address,
                 scope,
@@ -113,10 +114,10 @@ export async function cmdHoldings(args) {
                 vaults: [],
                 markets: [],
                 message: "No positions found",
-            }));
+            });
             process.exit(0);
         }
-        console.log(JSON.stringify({
+        printJson({
             status: "success",
             address,
             scope,
@@ -128,15 +129,15 @@ export async function cmdHoldings(args) {
             diagnostics,
             vaults,
             markets,
-        }));
+        });
         process.exit(0);
     }
     catch (err) {
-        console.log(JSON.stringify({
+        printJson({
             status: "error",
             reason: "sdk_error",
             message: err.message,
-        }));
+        });
         process.exit(1);
     }
 }

@@ -38,6 +38,7 @@ function parseCliInput() {
       "set-rpc": { type: "boolean" },
       "clear-rpc": { type: "boolean" },
       url: { type: "string" },
+      "debug-log-file": { type: "string" },
       help: { type: "boolean", short: "h" }
     }
   });
@@ -47,6 +48,7 @@ function parseCliInput() {
   return {
     command,
     help: Boolean(values.help),
+    debugLogFile: values["debug-log-file"],
     args: {
       vault: values.vault,
       market: values.market,
@@ -103,6 +105,117 @@ function parseCliInput() {
       show: values.show
     }
   };
+}
+
+// src/cli/debug-log.ts
+import { appendFileSync, mkdirSync } from "fs";
+import { dirname, resolve } from "path";
+function writeRecord(filePath, record) {
+  try {
+    appendFileSync(filePath, `${JSON.stringify(record)}
+`, "utf8");
+  } catch {
+  }
+}
+function toText(chunk, encoding) {
+  if (typeof chunk === "string") return chunk;
+  if (chunk instanceof Uint8Array) {
+    return Buffer.from(chunk).toString(encoding || "utf8");
+  }
+  return String(chunk);
+}
+function normalizeWriteArgs(encodingOrCb, cb) {
+  if (typeof encodingOrCb === "function") {
+    return { encoding: void 0, callback: encodingOrCb };
+  }
+  return { encoding: encodingOrCb, callback: cb };
+}
+function parseJsonIfPossible(line) {
+  try {
+    return JSON.parse(line);
+  } catch {
+    return void 0;
+  }
+}
+function isStructuredJson(value) {
+  return Array.isArray(value) || typeof value === "object" && value !== null;
+}
+function patchWriteStream(streamName, stream, filePath, skill) {
+  const originalWrite = stream.write.bind(stream);
+  let buffer = "";
+  const emitLine = (line) => {
+    if (!line) return;
+    const parsed2 = parseJsonIfPossible(line);
+    const record = {
+      ts: (/* @__PURE__ */ new Date()).toISOString(),
+      pid: process.pid,
+      skill,
+      stream: streamName,
+      line
+    };
+    if (isStructuredJson(parsed2)) {
+      record.json = parsed2;
+    }
+    writeRecord(filePath, record);
+  };
+  const flushBuffer = () => {
+    if (!buffer) return;
+    emitLine(buffer.replace(/\r$/, ""));
+    buffer = "";
+  };
+  stream.write = ((chunk, encodingOrCb, cb) => {
+    const { encoding, callback } = normalizeWriteArgs(encodingOrCb, cb);
+    const text = toText(chunk, encoding);
+    buffer += text;
+    let index = buffer.indexOf("\n");
+    while (index >= 0) {
+      const line = buffer.slice(0, index).replace(/\r$/, "");
+      emitLine(line);
+      buffer = buffer.slice(index + 1);
+      index = buffer.indexOf("\n");
+    }
+    if (encoding !== void 0 && callback) {
+      return originalWrite(chunk, encoding, callback);
+    }
+    if (encoding !== void 0) {
+      return originalWrite(chunk, encoding);
+    }
+    if (callback) {
+      return originalWrite(chunk, callback);
+    }
+    return originalWrite(chunk);
+  });
+  return flushBuffer;
+}
+function setupDebugLogFile(skill, cliLogFile) {
+  const requested = cliLogFile || process.env.SKILL_DEBUG_LOG_FILE || process.env.DEBUG_LOG_FILE;
+  if (!requested) return null;
+  const filePath = resolve(requested);
+  try {
+    mkdirSync(dirname(filePath), { recursive: true });
+  } catch {
+  }
+  process.env.SKILL_DEBUG_LOG_FILE = filePath;
+  const flushStdout = patchWriteStream("stdout", process.stdout, filePath, skill);
+  const flushStderr = patchWriteStream("stderr", process.stderr, filePath, skill);
+  const flushAll = () => {
+    flushStdout();
+    flushStderr();
+  };
+  process.on("beforeExit", flushAll);
+  process.on("exit", flushAll);
+  writeRecord(filePath, {
+    ts: (/* @__PURE__ */ new Date()).toISOString(),
+    pid: process.pid,
+    skill,
+    stream: "stderr",
+    line: "debug_log_enabled",
+    config: {
+      filePath,
+      argv: process.argv.slice(2)
+    }
+  });
+  return filePath;
 }
 
 // src/cli/help.ts
@@ -182,6 +295,7 @@ Options:
   --scope <type>             Holdings scope: all|vault|market|selected
   --show                     Show current selection/config
   --clear                    Clear selection
+  --debug-log-file <path>    Append structured stdout/stderr logs to a file (jsonl)
 
 Workflow Examples:
   Vault:
@@ -206,11 +320,11 @@ Supported Chains:
 
 // src/cli/meta.ts
 import { readFileSync } from "fs";
-import { resolve, dirname } from "path";
+import { resolve as resolve2, dirname as dirname2 } from "path";
 import { fileURLToPath } from "url";
 function loadCliMeta() {
-  const __dirname2 = dirname(fileURLToPath(import.meta.url));
-  const pkgPath = resolve(__dirname2, "../../package.json");
+  const __dirname2 = dirname2(fileURLToPath(import.meta.url));
+  const pkgPath = resolve2(__dirname2, "../../package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
   return {
     skillVersion: pkg.version || "0.1.0",
@@ -223,7 +337,7 @@ function loadCliMeta() {
 import { MoolahSDK } from "@lista-dao/moolah-lending-sdk";
 
 // src/config.ts
-import { existsSync, mkdirSync, readFileSync as readFileSync2, writeFileSync } from "fs";
+import { existsSync, mkdirSync as mkdirSync2, readFileSync as readFileSync2, writeFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 var CONFIG_DIR = join(homedir(), ".agent-wallet");
@@ -256,7 +370,7 @@ var DEFAULT_CONFIG = {
 };
 function ensureConfigDir() {
   if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true });
+    mkdirSync2(CONFIG_DIR, { recursive: true });
   }
 }
 function loadConfig() {
@@ -411,7 +525,7 @@ async function getMarketRuntimeData(chainId, marketId, walletAddress) {
 import { execSync } from "child_process";
 
 // src/utils/tx-error.ts
-function toText(value) {
+function toText2(value) {
   if (value === null || value === void 0) return "";
   if (typeof value === "string") return value;
   if (value instanceof Buffer) return value.toString("utf-8");
@@ -432,9 +546,9 @@ function parseJsonLines(text) {
 function extractWalletConnectResponses(err) {
   const e = err;
   const chunks = [
-    toText(e.stdout),
-    toText(e.stderr),
-    ...Array.isArray(e.output) ? e.output.map((item) => toText(item)) : []
+    toText2(e.stdout),
+    toText2(e.stderr),
+    ...Array.isArray(e.output) ? e.output.map((item) => toText2(item)) : []
   ].filter(Boolean);
   const responses = [];
   for (const chunk of chunks) {
@@ -540,10 +654,10 @@ function mapExecutionError(err, step) {
 }
 
 // src/executor/constants.ts
-import { resolve as resolve2, dirname as dirname2 } from "path";
+import { resolve as resolve3, dirname as dirname3 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
-var __dirname = dirname2(fileURLToPath2(import.meta.url));
-var WALLET_CONNECT_CLI = resolve2(
+var __dirname = dirname3(fileURLToPath2(import.meta.url));
+var WALLET_CONNECT_CLI = resolve3(
   __dirname,
   "../../../lista-wallet-connect/dist/cli/cli.bundle.mjs"
 );
@@ -719,7 +833,7 @@ async function executeSteps(steps, options) {
 }
 
 // src/context.ts
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "fs";
+import { existsSync as existsSync2, mkdirSync as mkdirSync3, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "fs";
 import { homedir as homedir2 } from "os";
 import { join as join2 } from "path";
 var CONFIG_DIR2 = join2(homedir2(), ".agent-wallet");
@@ -737,7 +851,7 @@ var DEFAULT_CONTEXT = {
 };
 function ensureConfigDir2() {
   if (!existsSync2(CONFIG_DIR2)) {
-    mkdirSync2(CONFIG_DIR2, { recursive: true });
+    mkdirSync3(CONFIG_DIR2, { recursive: true });
   }
 }
 function isObject(value) {
@@ -1073,8 +1187,14 @@ function resolveMarketContext(args, ctx, options) {
 }
 
 // src/commands/shared/output.ts
+function stringifyJson(payload) {
+  return JSON.stringify(payload);
+}
 function printJson(payload) {
-  console.log(JSON.stringify(payload));
+  console.log(stringifyJson(payload));
+}
+function printErrorJson(payload) {
+  console.error(stringifyJson(payload));
 }
 function exitWithCode(code) {
   process.exit(code);
@@ -1384,79 +1504,59 @@ async function cmdConfig(args) {
         source: customUrl ? "custom" : "default"
       };
     }
-    console.log(
-      JSON.stringify(
-        {
-          defaultChain: config.defaultChain,
-          supportedChains: SUPPORTED_CHAINS,
-          rpcUrls: rpcStatus,
-          configFile: "~/.agent-wallet/lending-config.json"
-        },
-        null,
-        2
-      )
-    );
+    printJson({
+      defaultChain: config.defaultChain,
+      supportedChains: SUPPORTED_CHAINS,
+      rpcUrls: rpcStatus,
+      configFile: "~/.agent-wallet/lending-config.json"
+    });
     return;
   }
   if (args.setRpc) {
     if (!args.chain) {
-      console.log(
-        JSON.stringify({ status: "error", reason: "--chain required" })
-      );
+      printJson({ status: "error", reason: "--chain required" });
       process.exit(1);
     }
     if (!args.url) {
-      console.log(
-        JSON.stringify({ status: "error", reason: "--url required" })
-      );
+      printJson({ status: "error", reason: "--url required" });
       process.exit(1);
     }
     try {
       setRpcUrl(args.chain, args.url);
-      console.log(
-        JSON.stringify({
-          status: "success",
-          action: "set_rpc",
-          chain: args.chain,
-          url: args.url
-        })
-      );
+      printJson({
+        status: "success",
+        action: "set_rpc",
+        chain: args.chain,
+        url: args.url
+      });
     } catch (err) {
-      console.log(
-        JSON.stringify({
-          status: "error",
-          reason: err.message
-        })
-      );
+      printJson({
+        status: "error",
+        reason: err.message
+      });
       process.exit(1);
     }
     return;
   }
   if (args.clearRpc) {
     if (!args.chain) {
-      console.log(
-        JSON.stringify({ status: "error", reason: "--chain required" })
-      );
+      printJson({ status: "error", reason: "--chain required" });
       process.exit(1);
     }
     try {
       clearRpcUrl(args.chain);
       const defaultUrl = getRpcUrl(args.chain);
-      console.log(
-        JSON.stringify({
-          status: "success",
-          action: "clear_rpc",
-          chain: args.chain,
-          revertedTo: defaultUrl
-        })
-      );
+      printJson({
+        status: "success",
+        action: "clear_rpc",
+        chain: args.chain,
+        revertedTo: defaultUrl
+      });
     } catch (err) {
-      console.log(
-        JSON.stringify({
-          status: "error",
-          reason: err.message
-        })
-      );
+      printJson({
+        status: "error",
+        reason: err.message
+      });
       process.exit(1);
     }
     return;
@@ -1569,11 +1669,11 @@ function toApiChainFilter(chain, sdk) {
 async function withTimeout(promise, timeoutMs, label) {
   let timeoutId;
   try {
-    return await new Promise((resolve3, reject) => {
+    return await new Promise((resolve4, reject) => {
       timeoutId = setTimeout(() => {
         reject(new Error(`${label}_timeout_${timeoutMs}ms`));
       }, timeoutMs);
-      promise.then(resolve3).catch(reject);
+      promise.then(resolve4).catch(reject);
     });
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
@@ -1889,39 +1989,31 @@ function formatVaultDisplay(vault, index) {
 async function cmdVaults(args) {
   const chain = args.chain || "eip155:56";
   if (!isSupportedChain(chain, SUPPORTED_CHAINS)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: `Unsupported chain: ${chain}. Supported: ${SUPPORTED_CHAINS.join(", ")}`
-      })
-    );
+    printJson({
+      status: "error",
+      reason: `Unsupported chain: ${chain}. Supported: ${SUPPORTED_CHAINS.join(", ")}`
+    });
     process.exit(1);
   }
   if (args.page !== void 0 && !isPositiveInteger(args.page)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "--page must be a positive integer"
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "--page must be a positive integer"
+    });
     process.exit(1);
   }
   if (args.pageSize !== void 0 && !isPositiveInteger(args.pageSize)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "--page-size must be a positive integer"
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "--page-size must be a positive integer"
+    });
     process.exit(1);
   }
   if (args.order && !isValidOrder(args.order)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "--order must be asc or desc"
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "--order must be asc or desc"
+    });
     process.exit(1);
   }
   try {
@@ -1951,53 +2043,47 @@ async function cmdVaults(args) {
       }
     });
     if (vaults.length === 0) {
-      console.log(
-        JSON.stringify({
-          status: "success",
-          chain,
-          vaults: [],
-          message: "No vaults found"
-        })
-      );
-      return;
-    }
-    console.log(
-      JSON.stringify({
+      printJson({
         status: "success",
         chain,
-        count: vaults.length,
-        filters: {
-          page: args.page || 1,
-          pageSize: args.pageSize || 100,
-          sort: args.sort,
-          order: args.order,
-          zone: args.zone,
-          keyword: args.keyword,
-          assets: args.assets,
-          curators: args.curators
-        },
-        vaults: vaults.map((v, i) => ({
-          index: i,
-          address: v.address,
-          name: v.name,
-          asset: v.assetSymbol,
-          assetAddress: v.asset,
-          decimals: v.displayDecimal,
-          tvl: v.depositsUsd,
-          apy: v.apy,
-          curator: v.curator,
-          display: formatVaultDisplay(v, i)
-        }))
-      })
-    );
+        vaults: [],
+        message: "No vaults found"
+      });
+      return;
+    }
+    printJson({
+      status: "success",
+      chain,
+      count: vaults.length,
+      filters: {
+        page: args.page || 1,
+        pageSize: args.pageSize || 100,
+        sort: args.sort,
+        order: args.order,
+        zone: args.zone,
+        keyword: args.keyword,
+        assets: args.assets,
+        curators: args.curators
+      },
+      vaults: vaults.map((v, i) => ({
+        index: i,
+        address: v.address,
+        name: v.name,
+        asset: v.assetSymbol,
+        assetAddress: v.asset,
+        decimals: v.displayDecimal,
+        tvl: v.depositsUsd,
+        apy: v.apy,
+        curator: v.curator,
+        display: formatVaultDisplay(v, i)
+      }))
+    });
   } catch (err) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "sdk_error",
-        message: err.message
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "sdk_error",
+      message: err.message
+    });
     process.exit(1);
   }
 }
@@ -2016,39 +2102,31 @@ function formatUsd(value) {
 async function cmdMarkets(args) {
   const chain = args.chain || "eip155:56";
   if (!isSupportedChain(chain, SUPPORTED_CHAINS)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: `Unsupported chain: ${chain}. Supported: ${SUPPORTED_CHAINS.join(", ")}`
-      })
-    );
+    printJson({
+      status: "error",
+      reason: `Unsupported chain: ${chain}. Supported: ${SUPPORTED_CHAINS.join(", ")}`
+    });
     process.exit(1);
   }
   if (args.page !== void 0 && !isPositiveInteger(args.page)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "--page must be a positive integer"
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "--page must be a positive integer"
+    });
     process.exit(1);
   }
   if (args.pageSize !== void 0 && !isPositiveInteger(args.pageSize)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "--page-size must be a positive integer"
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "--page-size must be a positive integer"
+    });
     process.exit(1);
   }
   if (args.order && !isValidOrder(args.order)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "--order must be asc or desc"
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "--order must be asc or desc"
+    });
     process.exit(1);
   }
   try {
@@ -2081,58 +2159,52 @@ async function cmdMarkets(args) {
       }
     });
     if (filteredMarkets.length === 0) {
-      console.log(
-        JSON.stringify({
-          status: "success",
-          chain,
-          markets: [],
-          message: "No markets found",
-          note: MARKET_OPERATION_LIMITATION_NOTE
-        })
-      );
-      return;
-    }
-    console.log(
-      JSON.stringify({
+      printJson({
         status: "success",
         chain,
-        count: filteredMarkets.length,
-        filters: {
-          page: args.page || 1,
-          pageSize: args.pageSize || 100,
-          sort: args.sort,
-          order: args.order,
-          zone: args.zone,
-          keyword: args.keyword,
-          loans: args.loans,
-          collaterals: args.collaterals
-        },
-        note: MARKET_OPERATION_LIMITATION_NOTE,
-        markets: filteredMarkets.map((m, i) => ({
-          index: i,
-          marketId: m.id,
-          collateralSymbol: m.collateral,
-          loanSymbol: m.loan,
-          zone: m.zone,
-          termType: m.termType,
-          lltv: m.lltv,
-          supplyApy: m.supplyApy,
-          borrowRate: m.rate,
-          liquidity: m.liquidity,
-          liquidityUsd: m.liquidityUsd,
-          vaults: m.vaults?.map((v) => v.name).join(", "),
-          display: `[${i}] ${m.collateral}/${m.loan} - LLTV: ${(Number.parseFloat(m.lltv) * 100).toFixed(1)}%, Liquidity: $${formatUsd(m.liquidityUsd)}`
-        }))
-      })
-    );
+        markets: [],
+        message: "No markets found",
+        note: MARKET_OPERATION_LIMITATION_NOTE
+      });
+      return;
+    }
+    printJson({
+      status: "success",
+      chain,
+      count: filteredMarkets.length,
+      filters: {
+        page: args.page || 1,
+        pageSize: args.pageSize || 100,
+        sort: args.sort,
+        order: args.order,
+        zone: args.zone,
+        keyword: args.keyword,
+        loans: args.loans,
+        collaterals: args.collaterals
+      },
+      note: MARKET_OPERATION_LIMITATION_NOTE,
+      markets: filteredMarkets.map((m, i) => ({
+        index: i,
+        marketId: m.id,
+        collateralSymbol: m.collateral,
+        loanSymbol: m.loan,
+        zone: m.zone,
+        termType: m.termType,
+        lltv: m.lltv,
+        supplyApy: m.supplyApy,
+        borrowRate: m.rate,
+        liquidity: m.liquidity,
+        liquidityUsd: m.liquidityUsd,
+        vaults: m.vaults?.map((v) => v.name).join(", "),
+        display: `[${i}] ${m.collateral}/${m.loan} - LLTV: ${(Number.parseFloat(m.lltv) * 100).toFixed(1)}%, Liquidity: $${formatUsd(m.liquidityUsd)}`
+      }))
+    });
   } catch (err) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "sdk_error",
-        message: err.message
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "sdk_error",
+      message: err.message
+    });
     process.exit(1);
   }
 }
@@ -2143,30 +2215,24 @@ async function cmdHoldings(args) {
   const address = args.address || ctx.userAddress;
   const scope = args.scope || "all";
   if (!address) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "--address required (or select a wallet first)"
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "--address required (or select a wallet first)"
+    });
     process.exit(1);
   }
   if (!isValidAddress(address)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: `Invalid address: ${address}`
-      })
-    );
+    printJson({
+      status: "error",
+      reason: `Invalid address: ${address}`
+    });
     process.exit(1);
   }
   if (!["all", "vault", "market", "selected"].includes(scope)) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "--scope must be all, vault, market, or selected"
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "--scope must be all, vault, market, or selected"
+    });
     process.exit(1);
   }
   try {
@@ -2182,12 +2248,10 @@ async function cmdHoldings(args) {
       markets = await fetchMarketPositions(address);
     } else {
       if (!ctx.selectedVault && !ctx.selectedMarket) {
-        console.log(
-          JSON.stringify({
-            status: "error",
-            reason: "No selected position. Use select first or query --scope all"
-          })
-        );
+        printJson({
+          status: "error",
+          reason: "No selected position. Use select first or query --scope all"
+        });
         process.exit(1);
       }
       const [vaultData, marketData] = await Promise.all([
@@ -2237,48 +2301,42 @@ async function cmdHoldings(args) {
       marketErrors: markets.filter((item) => Boolean(item.error)).length
     };
     if (count === 0) {
-      console.log(
-        JSON.stringify({
-          status: "success",
-          address,
-          scope,
-          counts: {
-            vaults: 0,
-            markets: 0,
-            total: 0
-          },
-          diagnostics,
-          vaults: [],
-          markets: [],
-          message: "No positions found"
-        })
-      );
-      process.exit(0);
-    }
-    console.log(
-      JSON.stringify({
+      printJson({
         status: "success",
         address,
         scope,
         counts: {
-          vaults: vaults.length,
-          markets: markets.length,
-          total: count
+          vaults: 0,
+          markets: 0,
+          total: 0
         },
         diagnostics,
-        vaults,
-        markets
-      })
-    );
+        vaults: [],
+        markets: [],
+        message: "No positions found"
+      });
+      process.exit(0);
+    }
+    printJson({
+      status: "success",
+      address,
+      scope,
+      counts: {
+        vaults: vaults.length,
+        markets: markets.length,
+        total: count
+      },
+      diagnostics,
+      vaults,
+      markets
+    });
     process.exit(0);
   } catch (err) {
-    console.log(
-      JSON.stringify({
-        status: "error",
-        reason: "sdk_error",
-        message: err.message
-      })
-    );
+    printJson({
+      status: "error",
+      reason: "sdk_error",
+      message: err.message
+    });
     process.exit(1);
   }
 }
@@ -3277,8 +3335,9 @@ async function runCommand(command, routedArgs, meta2) {
 }
 
 // src/cli.ts
-var meta = loadCliMeta();
 var parsed = parseCliInput();
+setupDebugLogFile("@lista-dao/lista-lending-skill", parsed.debugLogFile);
+var meta = loadCliMeta();
 var SKILL_VERSION = meta.skillVersion;
 var SKILL_NAME = meta.skillName;
 var WALLET_CONNECT_VERSION = meta.walletConnectVersion;
@@ -3298,7 +3357,7 @@ runCommand(
   },
   meta
 ).catch((err) => {
-  console.error(JSON.stringify({ error: err.message }));
+  printErrorJson({ error: err.message });
   process.exit(1);
 });
 export {

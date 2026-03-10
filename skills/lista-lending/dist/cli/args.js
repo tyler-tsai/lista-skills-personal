@@ -39,6 +39,7 @@ export function parseCliInput() {
             "set-rpc": { type: "boolean" },
             "clear-rpc": { type: "boolean" },
             url: { type: "string" },
+            "debug-log-file": { type: "string" },
             help: { type: "boolean", short: "h" },
         },
     });
@@ -52,6 +53,7 @@ export function parseCliInput() {
     return {
         command,
         help: Boolean(values.help),
+        debugLogFile: values["debug-log-file"],
         args: {
             vault: values.vault,
             market: values.market,
