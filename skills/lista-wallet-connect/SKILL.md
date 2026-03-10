@@ -73,7 +73,17 @@ Optional: you can also place env vars in `skills/lista-wallet-connect/.env`.
 - Agent execution entrypoint: `node dist/cli.js <command> ...`
 - `stdout`: JSON payloads for automation/agent parsing
 - `stderr`: progress/diagnostic logs
+- In non-TTY agent environments, wallet-request commands also emit periodic `waiting_for_approval` JSON heartbeat events on `stdout` until a final result is returned.
 - Treat raw JSON payloads as internal contract data; only show raw output to users on explicit request.
+
+### OpenClaw Streaming Rules (Required)
+
+- Run wallet-request commands (`pair`, `auth`, `sign`, `sign-typed-data`, `send-tx`, `call`) as long-running streams.
+- Do not stop on `status: "waiting_for_approval"`; this is an interim event only.
+- Continue consuming output until a terminal status is received.
+- Terminal statuses: `paired`, `authenticated`, `signed`, `sent`, `rejected`, `simulation_failed`, `error`.
+- If no terminal status arrives before process timeout, return timeout as an operational error and prompt retry.
+- For `pair`, use `qrPath` as image attachment (or `qrMarkdown` if renderer supports it). If image rendering fails, send the `uri` text fallback.
 
 ## Supported Chains
 
@@ -120,7 +130,7 @@ node skills/lista-wallet-connect/dist/cli.js pair --chains eip155:56 --open
 ```
 
 Behavior:
-- First outputs `status: "waiting_for_approval"` with `uri`, `qrPath` (and sometimes `qrBase64`) plus a guidance message.
+- First outputs `status: "waiting_for_approval"` with `uri`, `qrPath`, `qrMarkdown`, plus a guidance message.
 - After user approves, outputs `status: "paired"` with `message`, `topic`, `accounts`, `peerName`, `pairedAt`, and `summary`.
 
 ### 2) `status`

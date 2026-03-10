@@ -98,13 +98,43 @@ export async function resolveAddress(addressOrEns: string): Promise<string> {
 export async function requestWithTimeout(
   client: InstanceType<typeof SignClient>,
   requestParams: Parameters<InstanceType<typeof SignClient>["request"]>[0],
-  { pollIntervalMs = 10000, timeoutMs = 300000 } = {},
+  {
+    pollIntervalMs = 10000,
+    timeoutMs = 300000,
+    phase = "wallet_request",
+    context,
+    emitStdoutHeartbeat,
+  }: {
+    pollIntervalMs?: number;
+    timeoutMs?: number;
+    phase?: string;
+    context?: Record<string, unknown>;
+    emitStdoutHeartbeat?: boolean;
+  } = {},
 ): Promise<unknown> {
   const start = Date.now();
+  const shouldEmitStdout =
+    emitStdoutHeartbeat ?? (!process.stdout.isTTY || process.env.WC_STDOUT_HEARTBEAT === "1");
+
+  const emitHeartbeat = () => {
+    const elapsed = Date.now() - start;
+    const heartbeat = {
+      status: "waiting_for_approval",
+      phase,
+      elapsedMs: elapsed,
+      timeoutMs,
+      ...(context || {}),
+    };
+    console.error(JSON.stringify(heartbeat));
+    if (shouldEmitStdout) {
+      console.log(JSON.stringify(heartbeat));
+    }
+  };
+
+  emitHeartbeat();
 
   const pollTimer = setInterval(() => {
-    const elapsed = Date.now() - start;
-    console.error(JSON.stringify({ waiting: true, elapsed, timeout: timeoutMs }));
+    emitHeartbeat();
   }, pollIntervalMs);
 
   try {

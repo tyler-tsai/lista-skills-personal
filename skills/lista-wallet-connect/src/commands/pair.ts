@@ -11,6 +11,12 @@ import { getClient } from "../client.js";
 import { saveSession, SESSIONS_DIR } from "../storage.js";
 import type { ParsedArgs } from "../types.js";
 
+const PAIR_HEARTBEAT_MS = 10000;
+
+function shouldEmitStdoutHeartbeat(): boolean {
+  return !process.stdout.isTTY || process.env.WC_STDOUT_HEARTBEAT === "1";
+}
+
 /**
  * Detect if running in a terminal environment where we should auto-open QR.
  * Returns true for: direct terminal, SSH, VSCode integrated terminal
@@ -143,30 +149,41 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
     openedBySystem = openFile(qrPath);
   }
 
-  // Build output with optional base64 for non-TTY environments
+  // Build output for agent/CLI environments.
   const output: Record<string, unknown> = {
     uri,
     qrPath,
+    qrMarkdown: `![WalletConnect QR](${qrPath})`,
     status: "waiting_for_approval",
     message: "Scan and approve this WalletConnect request in your wallet app.",
+    deliveryHint: "Send qrPath as image attachment. If image delivery fails, share uri as plain text.",
   };
-
-  // For non-TTY (Claude Code, piped), include base64 so caller can display
-  if (!autoOpen) {
-    const qrBase64 = await QRCode.toDataURL(uri!, { width: 400, margin: 2 });
-    output.qrBase64 = qrBase64;
-  }
 
   if (!autoOpen || !openedBySystem) {
     output.note =
-      "If the QR image is not displayed correctly, use another method (open qrPath manually or use uri directly).";
+      "If image preview is unavailable, open qrPath manually (macOS: open <qrPath>, Linux: xdg-open <qrPath>, Windows: start <qrPath>) or use the wc: uri directly in your wallet app.";
   }
 
   if (autoOpen && !openedBySystem) {
     output.openFailed = true;
   }
 
-  console.log(JSON.stringify(output, null, 2));
+  console.log(JSON.stringify(output));
+
+  const emitStdoutHeartbeat = shouldEmitStdoutHeartbeat();
+  const waitingStartedAt = Date.now();
+  const heartbeatTimer = setInterval(() => {
+    const heartbeat = {
+      status: "waiting_for_approval",
+      phase: "pair",
+      elapsedMs: Date.now() - waitingStartedAt,
+      message: "Waiting for wallet approval.",
+    };
+    console.error(JSON.stringify(heartbeat));
+    if (emitStdoutHeartbeat) {
+      console.log(JSON.stringify(heartbeat));
+    }
+  }, PAIR_HEARTBEAT_MS);
 
   try {
     const session = await approval();
@@ -183,31 +200,29 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
     });
 
     console.log(
-      JSON.stringify(
-        {
-          status: "paired",
-          message: `Wallet connected successfully (${walletName}).`,
-          topic: session.topic,
-          accounts,
-          peerName: walletName,
-          pairedAt,
-          summary: {
-            chainCount: summary.chains.length,
-            accountCount: accounts.length,
-            chains: summary.chains,
-            primaryAccount: summary.primaryAccount,
-          },
-          nextActions: [
-            "Use whoami/status to verify the active session.",
-            "Use auth if a consent signature is required before operations.",
-          ],
+      JSON.stringify({
+        status: "paired",
+        message: `Wallet connected successfully (${walletName}).`,
+        topic: session.topic,
+        accounts,
+        peerName: walletName,
+        pairedAt,
+        summary: {
+          chainCount: summary.chains.length,
+          accountCount: accounts.length,
+          chains: summary.chains,
+          primaryAccount: summary.primaryAccount,
         },
-        null,
-        2,
-      ),
+        nextActions: [
+          "Use whoami/status to verify the active session.",
+          "Use auth if a consent signature is required before operations.",
+        ],
+      }),
     );
   } catch (err) {
     console.log(JSON.stringify({ status: "rejected", error: (err as Error).message }));
+  } finally {
+    clearInterval(heartbeatTimer);
   }
 
   await client.core.relayer.transportClose().catch(() => {});

@@ -121,6 +121,15 @@ export async function cmdCall(args: ParsedArgs): Promise<void> {
         method: "eth_sendTransaction",
         params: [tx],
       },
+    }, {
+      phase: "call",
+      context: {
+        command: "call",
+        topic: args.topic,
+        chain: evmChain,
+        from,
+        to: resolvedTo,
+      },
     });
     const explorerUrl = EXPLORER_URLS[evmChain] || "";
     console.log(

@@ -48,6 +48,14 @@ export async function cmdAuth(args: ParsedArgs): Promise<void> {
         method: "personal_sign",
         params: [encodeEvmMessage(message), address],
       },
+    }, {
+      phase: "auth",
+      context: {
+        command: "auth",
+        topic: args.topic,
+        chainId,
+        address: display,
+      },
     });
 
     saveSession(args.topic, {

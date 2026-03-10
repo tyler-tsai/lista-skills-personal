@@ -77,6 +77,17 @@ export async function cmdSendTx(args: ParsedArgs): Promise<void> {
         method: "eth_sendTransaction",
         params: [tx],
       },
+    }, {
+      phase: "send_tx",
+      context: {
+        command: "send-tx",
+        topic: args.topic,
+        chain,
+        from,
+        to: resolvedTo,
+        token: tokenLabel,
+        amount: args.amount,
+      },
     });
 
     const explorerUrl = EXPLORER_URLS[chain] || "";

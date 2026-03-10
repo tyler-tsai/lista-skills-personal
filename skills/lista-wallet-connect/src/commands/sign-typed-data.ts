@@ -115,11 +115,18 @@ export async function cmdSignTypedData(args: ParsedArgs): Promise<void> {
       method: "eth_signTypedData_v4",
       params: [address, JSON.stringify(payload)],
     },
+  }, {
+    phase: "sign_typed_data",
+    context: {
+      command: "sign-typed-data",
+      topic: args.topic,
+      chainId,
+      address,
+      primaryType,
+    },
   });
 
-  console.log(
-    JSON.stringify({ status: "signed", address, signature, chain: chainId, primaryType }, null, 2),
-  );
+  console.log(JSON.stringify({ status: "signed", address, signature, chain: chainId, primaryType }));
   await client.core.relayer.transportClose().catch(() => {});
   process.exit(0);
 }

@@ -42,11 +42,19 @@ export async function cmdSign(args: ParsedArgs): Promise<void> {
       method: "personal_sign",
       params: [encodeEvmMessage(args.message), address],
     },
+  }, {
+    phase: "sign",
+    context: {
+      command: "sign",
+      topic: args.topic,
+      chainId,
+      address,
+    },
   });
 
   const result = { status: "signed", address, signature, chain: chainId };
 
-  console.log(JSON.stringify(result, null, 2));
+  console.log(JSON.stringify(result));
   await client.core.relayer.transportClose().catch(() => {});
   process.exit(0);
 }
