@@ -50,14 +50,22 @@ Notes:
 
 ## Setup (Agent-Run)
 
-Agent should run these steps automatically when environment is not ready:
+Use prebuilt `dist/` by default for faster startup.
 
 ```bash
 cd skills/lista-wallet-connect
 # ensure Node.js >= 18 (recommended >= 20)
 node -v
+node dist/cli.js version
+```
+
+Only run install/build when `dist/` is missing or version check fails:
+
+```bash
+cd skills/lista-wallet-connect
 npm install
 npm run build
+node dist/cli.js version
 ```
 
 Set WalletConnect project id:

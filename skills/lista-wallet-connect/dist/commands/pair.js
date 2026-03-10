@@ -1,0 +1,209 @@
+/**
+ * Pair command -- create a new WalletConnect pairing session (EVM only).
+ */
+import QRCode from "qrcode";
+import { mkdirSync } from "fs";
+import { join } from "path";
+import { execSync } from "child_process";
+import { parseAccountId, parseChainId } from "@walletconnect/utils";
+import { getClient } from "../client.js";
+import { saveSession, SESSIONS_DIR } from "../storage.js";
+const PAIR_HEARTBEAT_MS = 10000;
+function shouldEmitStdoutHeartbeat() {
+    return !process.stdout.isTTY || process.env.WC_STDOUT_HEARTBEAT === "1";
+}
+/**
+ * Detect if running in a terminal environment where we should auto-open QR.
+ * Returns true for: direct terminal, SSH, VSCode integrated terminal
+ * Returns false for: piped output, Claude Code extension, programmatic usage
+ *
+ * @param forceOpen - If true (--open flag), always open regardless of environment
+ */
+function shouldAutoOpenQR(forceOpen) {
+    // --open flag forces opening in agent environments (Claude, Codex, Cursor)
+    if (forceOpen)
+        return true;
+    // If stdout is not a TTY, we're being piped/captured - output image data instead
+    if (!process.stdout.isTTY)
+        return false;
+    // Check for Claude Code / agent environment
+    if (process.env.CLAUDE_CODE || process.env.AGENT_MODE)
+        return false;
+    // Default: auto-open in terminal
+    return true;
+}
+/**
+ * Open file with system default application (cross-platform)
+ */
+function openFile(filePath) {
+    const platform = process.platform;
+    try {
+        if (platform === "darwin") {
+            execSync(`open "${filePath}"`);
+        }
+        else if (platform === "win32") {
+            execSync(`start "" "${filePath}"`);
+        }
+        else {
+            execSync(`xdg-open "${filePath}"`);
+        }
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+const NAMESPACE_CONFIG = {
+    eip155: {
+        methods: ["personal_sign", "eth_sendTransaction", "eth_signTypedData_v4"],
+        events: ["chainChanged", "accountsChanged"],
+    },
+};
+function shortAddress(address) {
+    if (!address || address.length < 10)
+        return address;
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+function buildPairSummary(accounts) {
+    const parsed = accounts
+        .map((account) => {
+        try {
+            const info = parseAccountId(account);
+            return {
+                chain: `${info.namespace}:${info.reference}`,
+                address: info.address,
+            };
+        }
+        catch {
+            return null;
+        }
+    })
+        .filter((item) => item !== null);
+    const chains = Array.from(new Set(parsed.map((item) => item.chain)));
+    const addresses = Array.from(new Set(parsed.map((item) => item.address)));
+    const primary = parsed[0];
+    return {
+        chains,
+        addresses,
+        primaryAccount: primary
+            ? {
+                chain: primary.chain,
+                address: primary.address,
+                display: shortAddress(primary.address),
+            }
+            : undefined,
+    };
+}
+export async function cmdPair(args) {
+    const chains = args.chains ? args.chains.split(",") : ["eip155:56", "eip155:1"];
+    const byNamespace = {};
+    for (const chain of chains) {
+        const { namespace } = parseChainId(chain);
+        if (!NAMESPACE_CONFIG[namespace]) {
+            console.error(JSON.stringify({ error: `Unsupported namespace: ${namespace}. Only EVM (eip155) is supported.` }));
+            process.exit(1);
+        }
+        if (!byNamespace[namespace])
+            byNamespace[namespace] = [];
+        byNamespace[namespace].push(chain);
+    }
+    const requiredNamespaces = {};
+    for (const [ns, nsChains] of Object.entries(byNamespace)) {
+        requiredNamespaces[ns] = {
+            chains: nsChains,
+            ...NAMESPACE_CONFIG[ns],
+        };
+    }
+    const debug = process.env.WC_DEBUG === "1";
+    const t0 = Date.now();
+    const client = await getClient();
+    if (debug)
+        console.error(`[WC] getClient() done in ${Date.now() - t0}ms`);
+    const t1 = Date.now();
+    const { uri, approval } = await client.connect({ requiredNamespaces });
+    if (debug)
+        console.error(`[WC] client.connect() done in ${Date.now() - t1}ms`);
+    const qrPath = join(SESSIONS_DIR, `qr-${Date.now()}.png`);
+    mkdirSync(SESSIONS_DIR, { recursive: true });
+    await QRCode.toFile(qrPath, uri, { width: 400, margin: 2 });
+    const autoOpen = shouldAutoOpenQR(args.open);
+    let openedBySystem = false;
+    // Auto-open QR in terminal environments
+    if (autoOpen) {
+        openedBySystem = openFile(qrPath);
+    }
+    // Build output for agent/CLI environments.
+    const output = {
+        uri,
+        qrPath,
+        qrMarkdown: `![WalletConnect QR](${qrPath})`,
+        status: "waiting_for_approval",
+        interactionRequired: true,
+        userReminder: "Wallet pairing is waiting for your confirmation. Please open your wallet app and approve or reject the request.",
+        message: "Scan and approve this WalletConnect request in your wallet app.",
+        deliveryHint: "Send qrPath as image attachment. If image delivery fails, share uri as plain text.",
+    };
+    if (!autoOpen || !openedBySystem) {
+        output.note =
+            "If image preview is unavailable, open qrPath manually (macOS: open <qrPath>, Linux: xdg-open <qrPath>, Windows: start <qrPath>) or use the wc: uri directly in your wallet app.";
+    }
+    if (autoOpen && !openedBySystem) {
+        output.openFailed = true;
+    }
+    console.log(JSON.stringify(output));
+    const emitStdoutHeartbeat = shouldEmitStdoutHeartbeat();
+    const waitingStartedAt = Date.now();
+    const heartbeatTimer = setInterval(() => {
+        const heartbeat = {
+            status: "waiting_for_approval",
+            phase: "pair",
+            elapsedMs: Date.now() - waitingStartedAt,
+            interactionRequired: true,
+            userReminder: "Wallet pairing is waiting for your confirmation. Please open your wallet app and approve or reject the request.",
+            message: "Waiting for wallet approval.",
+        };
+        console.error(JSON.stringify(heartbeat));
+        if (emitStdoutHeartbeat) {
+            console.log(JSON.stringify(heartbeat));
+        }
+    }, PAIR_HEARTBEAT_MS);
+    try {
+        const session = await approval();
+        const accounts = Object.values(session.namespaces).flatMap((ns) => ns.accounts || []);
+        const walletName = session.peer?.metadata?.name || "Unknown Wallet";
+        const pairedAt = new Date().toISOString();
+        const summary = buildPairSummary(accounts);
+        saveSession(session.topic, {
+            accounts,
+            chains,
+            peerName: walletName,
+            createdAt: pairedAt,
+        });
+        console.log(JSON.stringify({
+            status: "paired",
+            message: `Wallet connected successfully (${walletName}).`,
+            topic: session.topic,
+            accounts,
+            peerName: walletName,
+            pairedAt,
+            summary: {
+                chainCount: summary.chains.length,
+                accountCount: accounts.length,
+                chains: summary.chains,
+                primaryAccount: summary.primaryAccount,
+            },
+            nextActions: [
+                "Use whoami/status to verify the active session.",
+                "Use auth if a consent signature is required before operations.",
+            ],
+        }));
+    }
+    catch (err) {
+        console.log(JSON.stringify({ status: "rejected", error: err.message }));
+    }
+    finally {
+        clearInterval(heartbeatTimer);
+    }
+    await client.core.relayer.transportClose().catch(() => { });
+    process.exit(0);
+}

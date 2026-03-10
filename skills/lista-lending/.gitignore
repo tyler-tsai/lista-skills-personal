@@ -1,4 +1,4 @@
 node_modules/
-dist/
+# Keep dist/ committed for dist-first onboarding.
 *.log
 .env

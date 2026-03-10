@@ -145,13 +145,29 @@ Notes:
 
 ## Setup (Agent-Run)
 
-Agent should run these steps automatically when environment is not ready:
+Use prebuilt `dist/` by default for faster startup.
 
 ```bash
-# install dependencies
-cd skills/lista-lending && npm install
+cd skills/lista-lending
+# ensure Node.js >= 18 (recommended >= 20)
+node -v
+node dist/cli.js version
+```
 
-# build
+Only run install/build when `dist/` is missing or version check fails:
+
+```bash
+cd skills/lista-lending
+npm install
+npm run build
+node dist/cli.js version
+```
+
+If `skills/lista-wallet-connect/dist/cli.js` is missing, rebuild wallet-connect as well:
+
+```bash
+cd skills/lista-wallet-connect
+npm install
 npm run build
 ```
 
