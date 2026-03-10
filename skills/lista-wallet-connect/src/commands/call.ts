@@ -94,6 +94,8 @@ export async function cmdCall(args: ParsedArgs): Promise<void> {
           status: "simulation_failed",
           error: simResult.error,
           revertReason: simResult.revertReason,
+          revertData: simResult.revertData,
+          revertSelector: simResult.revertSelector,
           attempts: simResult.attempts,
           hint: "Transaction would revert on-chain. Use --no-simulate to force send (not recommended).",
         })
