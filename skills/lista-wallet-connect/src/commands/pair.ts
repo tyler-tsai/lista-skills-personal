@@ -6,7 +6,7 @@ import QRCode from "qrcode";
 import { mkdirSync } from "fs";
 import { join } from "path";
 import { execSync } from "child_process";
-import { parseChainId } from "@walletconnect/utils";
+import { parseAccountId, parseChainId } from "@walletconnect/utils";
 import { getClient } from "../client.js";
 import { saveSession, SESSIONS_DIR } from "../storage.js";
 import type { ParsedArgs } from "../types.js";
@@ -57,6 +57,47 @@ const NAMESPACE_CONFIG: Record<string, { methods: string[]; events: string[] }> 
   },
 };
 
+function shortAddress(address: string): string {
+  if (!address || address.length < 10) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function buildPairSummary(accounts: string[]): {
+  chains: string[];
+  addresses: string[];
+  primaryAccount?: { chain: string; address: string; display: string };
+} {
+  const parsed = accounts
+    .map((account) => {
+      try {
+        const info = parseAccountId(account);
+        return {
+          chain: `${info.namespace}:${info.reference}`,
+          address: info.address,
+        };
+      } catch {
+        return null;
+      }
+    })
+    .filter((item): item is { chain: string; address: string } => item !== null);
+
+  const chains = Array.from(new Set(parsed.map((item) => item.chain)));
+  const addresses = Array.from(new Set(parsed.map((item) => item.address)));
+  const primary = parsed[0];
+
+  return {
+    chains,
+    addresses,
+    primaryAccount: primary
+      ? {
+          chain: primary.chain,
+          address: primary.address,
+          display: shortAddress(primary.address),
+        }
+      : undefined,
+  };
+}
+
 export async function cmdPair(args: ParsedArgs): Promise<void> {
   const chains = args.chains ? args.chains.split(",") : ["eip155:1"];
 
@@ -100,6 +141,7 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
     uri,
     qrPath,
     status: "waiting_for_approval",
+    message: "Scan and approve this WalletConnect request in your wallet app.",
   };
 
   // For non-TTY (Claude Code, piped), include base64 so caller can display
@@ -118,21 +160,36 @@ export async function cmdPair(args: ParsedArgs): Promise<void> {
   try {
     const session = await approval();
     const accounts = Object.values(session.namespaces).flatMap((ns) => ns.accounts || []);
+    const walletName = session.peer?.metadata?.name || "Unknown Wallet";
+    const pairedAt = new Date().toISOString();
+    const summary = buildPairSummary(accounts);
 
     saveSession(session.topic, {
       accounts,
       chains,
-      peerName: session.peer?.metadata?.name || "Unknown Wallet",
-      createdAt: new Date().toISOString(),
+      peerName: walletName,
+      createdAt: pairedAt,
     });
 
     console.log(
       JSON.stringify(
         {
           status: "paired",
+          message: `Wallet connected successfully (${walletName}).`,
           topic: session.topic,
           accounts,
-          peerName: session.peer?.metadata?.name,
+          peerName: walletName,
+          pairedAt,
+          summary: {
+            chainCount: summary.chains.length,
+            accountCount: accounts.length,
+            chains: summary.chains,
+            primaryAccount: summary.primaryAccount,
+          },
+          nextActions: [
+            "Use whoami/status to verify the active session.",
+            "Use auth if a consent signature is required before operations.",
+          ],
         },
         null,
         2,

@@ -120,8 +120,8 @@ node skills/lista-wallet-connect/dist/cli.js pair --chains eip155:56 --open
 ```
 
 Behavior:
-- First outputs `status: "waiting_for_approval"` with `uri`, `qrPath` (and sometimes `qrBase64`).
-- After user approves, outputs `status: "paired"` with `topic`, `accounts`, `peerName`.
+- First outputs `status: "waiting_for_approval"` with `uri`, `qrPath` (and sometimes `qrBase64`) plus a guidance message.
+- After user approves, outputs `status: "paired"` with `message`, `topic`, `accounts`, `peerName`, `pairedAt`, and `summary`.
 
 ### 2) `status`
 
