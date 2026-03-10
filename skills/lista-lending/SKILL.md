@@ -4,17 +4,25 @@ version: 0.1.1
 repository: https://github.com/lista-dao/lista-skills
 requires:
   lista-wallet-connect: ">=1.0.0"
-  node: ">=18.0.0"
+node: ">=18.0.0"
 description: View and operate Lista Lending vaults/markets. Use when user asks about LENDING-ONLY positions or wants to deposit/withdraw/borrow/repay. For all-product overview, use lista-report instead.
 ---
 
 # Lista Lending Skill (POC)
 
 > **Status:** Pre-release (internal only, not in public registry)
-> **Quick check:** `node dist/cli.js version`
-> **Rebuild:** `npm install && npm run build`
+> **Agent quick check:** `node dist/cli.js version`
+> **Agent rebuild:** `npm install && npm run build`
 
 Execute Lista Lending vault and market operations through `@lista-dao/moolah-lending-sdk`, with transaction sending delegated to `lista-wallet-connect`.
+
+## Agent Execution Policy
+
+- Execute CLI/setup commands directly as the agent; do not ask the user to run shell commands.
+- If dependencies/build are missing or outdated, run setup/build automatically.
+- Before any signing or on-chain write action, explain the action and get user consent.
+- Do not output raw JSON/internal payloads to users by default; convert results into human-readable summaries/tables.
+- Use command snippets in this document as agent-side execution references only.
 
 ## When to Use This Skill
 
@@ -121,7 +129,9 @@ Notes:
 4. `lista-wallet-connect` is built (`skills/lista-wallet-connect/dist/cli.js` exists).
 5. `lista-lending` is built (`skills/lista-lending/dist/cli.js` exists).
 
-## Setup
+## Setup (Agent-Run)
+
+Agent should run these steps automatically when environment is not ready:
 
 ```bash
 # install dependencies
@@ -131,7 +141,7 @@ cd skills/lista-lending && npm install
 npm run build
 ```
 
-Run commands from this folder:
+Agent execution path:
 
 ```bash
 cd skills/lista-lending
@@ -145,7 +155,8 @@ node dist/cli.js <command> [options]
 
 ## Agent Display Guidelines
 
-For user-facing answers, keep CLI JSON as source of truth, then render with Markdown tables.
+For user-facing answers, keep CLI JSON as internal source of truth, then render human-readable tables/summaries.
+Return raw JSON only when the user explicitly asks for raw output.
 
 `vaults` recommended columns:
 
@@ -169,6 +180,7 @@ Default rule:
 
 - Use different table layouts for different commands (`vaults`, `markets`, `holdings`); do not reuse holdings layout for vault/market list pages.
 - Do **not** show `zone/termType` in user-facing table unless user explicitly asks for technical details.
+- Do **not** paste full raw payloads (JSON/RPC internals) in normal user-facing replies.
 - Derive `Reason` from flags:
   - `isSmartLending => SmartLending`
   - `isFixedTerm => Fixed-term`
@@ -209,6 +221,8 @@ Health definition (for market positions):
 - `--wallet-address <0x...>`
 
 ## Command Details
+
+All command snippets below are for agent execution; do not instruct the user to type them manually.
 
 ### 1) `version`
 

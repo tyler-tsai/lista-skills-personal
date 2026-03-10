@@ -9,10 +9,18 @@ description: Connect wallets via WalletConnect v2 and execute EVM signing/transa
 # Wallet Connect Skill
 
 > **Status:** Pre-release (internal only, not in public registry)
-> **Quick check:** `node dist/cli.js version`
-> **Rebuild:** `npm install && npm run build`
+> **Agent quick check:** `node dist/cli.js version`
+> **Agent rebuild:** `npm install && npm run build`
 
 Wallet connection and transaction bridge skill for EVM (`eip155:1`, `eip155:56`).
+
+## Agent Execution Policy
+
+- Execute CLI/setup commands directly as the agent; do not ask the user to run shell commands.
+- If dependencies/build/env are missing, fix them automatically in the workspace.
+- Before any signing or on-chain write action, explain the action and get user consent.
+- Do not output raw JSON/internal payloads to users by default; present concise human-readable summaries.
+- Use command snippets in this document as agent-side execution references only.
 
 ## Project Structure
 
@@ -40,7 +48,9 @@ Notes:
 - `src/cli.ts` stays as the entrypoint; argument parsing/help/dispatch are split under `src/cli/*`.
 - Raw call logic is modularized under `src/commands/call/*` (`parse`, `simulate`, constants).
 
-## Setup
+## Setup (Agent-Run)
+
+Agent should run these steps automatically when environment is not ready:
 
 ```bash
 cd skills/lista-wallet-connect
@@ -60,9 +70,10 @@ Optional: you can also place env vars in `skills/lista-wallet-connect/.env`.
 
 ## Runtime Contract
 
-- Commands (from skill folder): `node dist/cli.js <command> ...`
+- Agent execution entrypoint: `node dist/cli.js <command> ...`
 - `stdout`: JSON payloads for automation/agent parsing
 - `stderr`: progress/diagnostic logs
+- Treat raw JSON payloads as internal contract data; only show raw output to users on explicit request.
 
 ## Supported Chains
 
@@ -95,6 +106,8 @@ Optional: you can also place env vars in `skills/lista-wallet-connect/.env`.
 - `version`
 
 ## Command Details
+
+All command snippets below are for agent execution; do not instruct the user to type them manually.
 
 ### 1) `pair`
 
@@ -217,7 +230,7 @@ node skills/lista-wallet-connect/dist/cli.js tokens --chain eip155:56
 
 ### 10) `sessions`
 
-Purpose: Dump raw saved sessions JSON.
+Purpose: Dump raw saved sessions JSON (internal/debug usage).
 
 ```bash
 node skills/lista-wallet-connect/dist/cli.js sessions
