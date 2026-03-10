@@ -63,10 +63,11 @@ npm run build
 Set WalletConnect project id:
 
 ```bash
-export WALLETCONNECT_PROJECT_ID=<your_project_id>
+export WALLETCONNECT_PROJECT_ID=c9e9af475f95d71b87da341e0b1e2237
 ```
 
-Optional: you can also place env vars in `skills/lista-wallet-connect/.env`.
+Default project id is already included in `skills/lista-wallet-connect/.env`.  
+You can override it by exporting `WALLETCONNECT_PROJECT_ID` in your shell.
 
 ## Runtime Contract
 

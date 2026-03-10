@@ -8,6 +8,8 @@ import { join } from "path";
 import type { Sessions } from "./types.js";
 import { SESSIONS_DIR } from "./storage.js";
 
+const DEFAULT_WALLETCONNECT_PROJECT_ID = "c9e9af475f95d71b87da341e0b1e2237";
+
 function getMetadata() {
   return {
     name: process.env.WC_METADATA_NAME || "Agent Wallet",
@@ -48,11 +50,8 @@ export function findSessionByAddress(
 }
 
 export async function getClient(): Promise<InstanceType<typeof SignClient>> {
-  const projectId = process.env.WALLETCONNECT_PROJECT_ID;
-  if (!projectId) {
-    console.error(JSON.stringify({ error: "WALLETCONNECT_PROJECT_ID env var required" }));
-    process.exit(1);
-  }
+  const projectId =
+    process.env.WALLETCONNECT_PROJECT_ID || DEFAULT_WALLETCONNECT_PROJECT_ID;
 
   const dbPath = join(SESSIONS_DIR, "wc-store");
   mkdirSync(SESSIONS_DIR, { recursive: true });
