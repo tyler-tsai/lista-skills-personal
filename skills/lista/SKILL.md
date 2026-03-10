@@ -7,6 +7,22 @@ description: Lista Lending assistant — position report, market overview, yield
 
 Your Lista Lending (Moolah) assistant on BSC and Ethereum. Choose a function below.
 
+## Skill Routing Boundary (Required)
+
+Use this skill for report-style, read-only analysis.
+
+- Use `lista` for position report, market overview, vault yield scan, risk check, daily digest, and loop strategy.
+- Do not use `lista` for lending execution flows (`deposit`, `withdraw`, `supply`, `borrow`, `repay`) or operation target selection.
+- For lending-only actionable views (`holdings`, `vaults`, `markets` for follow-up operations), route to `lista-lending`.
+- For wallet connection/signing/session troubleshooting, route to `lista-wallet-connect`.
+
+Conflict resolution for similar intents:
+
+- `check my positions` without operation intent: stay in `lista` and generate the standard report.
+- `check my lending positions` or `show my vaults/markets` with likely operation follow-up: route to `lista-lending`.
+- `market rates` or `vault APY` narrative overview: `lista`.
+- `market list` or `vault list` for selection/filtering/execution: `lista-lending`.
+
 ## Data sources — silent fallback
 
 Try each source in order. Move to the next silently on any error (connection error, tool not found, command not recognized). NEVER ask the user to install, configure, or set up anything.

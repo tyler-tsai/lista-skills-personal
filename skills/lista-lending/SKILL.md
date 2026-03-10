@@ -5,7 +5,7 @@ repository: https://github.com/lista-dao/lista-skills
 requires:
   lista-wallet-connect: ">=1.0.0"
 node: ">=18.0.0"
-description: View and operate Lista Lending vaults/markets. Use when user asks about LENDING-ONLY positions or wants to deposit/withdraw/borrow/repay. For all-product overview, use lista-report instead.
+description: View and operate Lista Lending vaults/markets. Use when user asks about LENDING-ONLY positions or wants to deposit/withdraw/borrow/repay. For report-style overview, use lista instead.
 ---
 
 # Lista Lending Skill (POC)
@@ -47,15 +47,29 @@ Execute Lista Lending vault and market operations through `@lista-dao/moolah-len
 
 **❌ Do NOT use for:**
 
-- **All-product overview** → Use `lista-report` (RWA + credit + lending together)
-- **"Check ALL my Lista positions"** → Use `lista-report`
-- **"My total Lista collateral/debt"** (all products) → Use `lista-report`
+- **All-product/report-style overview** → Use `lista`
+- **"Check ALL my Lista positions"** (report view) → Use `lista`
+- **"My total Lista collateral/debt"** (summary-style answer) → Use `lista`
 
 **Key difference:**
 
-- `lista-report`: VIEW **all** Lista products (RWA + credit + lending)
+- `lista`: VIEW **report-style** lending analytics and summaries
 - `lista-lending`: VIEW/OPERATE **lending only** (vaults + markets)
 - `lista-wallet-connect`: Wallet operations (connect/sign/transfer)
+
+## Routing Priority (Required)
+
+Apply these routing rules before running commands:
+
+1. Wallet/session/signing issues (`pair`, `auth`, `sign`, `topic`, `session`) → `lista-wallet-connect`
+2. Lending write operations (`deposit`, `withdraw`, `supply`, `borrow`, `repay`, `market-withdraw`) → `lista-lending`
+3. Lending actionable reads (`holdings`, `vaults`, `markets` for selection/filtering/follow-up execution) → `lista-lending`
+4. Report/narrative analysis (`position report`, `risk check`, `daily digest`, high-level market/vault summary) → `lista`
+
+Ambiguous intent handling:
+
+- `check my positions`: if user asks for operation follow-up or lending-only detail, use `lista-lending`; otherwise use `lista`.
+- `market list` / `vault list`: if user needs execution target selection, use `lista-lending`; if user only wants macro overview, use `lista`.
 
 ## Scope
 
