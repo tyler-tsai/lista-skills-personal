@@ -38,15 +38,18 @@ Join data by marketId and compute per `references/domain.md`. Amounts are human-
 
 ## A.3 — Recommendations
 
-Generate 1–3 concise suggestions per address based on actual numbers:
+Generate 1–3 concise suggestions per address based on actual numbers. Use the risk levels and alert thresholds defined in `references/domain.md`.
 
-**Risk reduction (uncorrelated):**
-- LTV/LLTV >= 90% (DANGER): Repay debt or add collateral. Show amounts to reach 75% LTV/LLTV.
-- LTV/LLTV 80–90% (WARNING): Partial repayment or top-up. Amounts to reach 70% LTV/LLTV.
+**Risk reduction — alert triggered (ltvGap <= threshold):**
+- Repay debt or add collateral immediately. Show amounts to widen ltvGap to 2× threshold.
 
-**Risk reduction (correlated):**
-- LTV/LLTV >= 97% (DANGER): Immediate debt reduction. Amounts to reach 85% LTV/LLTV.
-- LTV/LLTV 92–97% (WARNING): Monitor collateral/loan price ratio. Real risk = depeg event.
+**Risk reduction — DANGER zone:**
+- Uncorrelated (LTV/LLTV >= 90%): Repay debt or add collateral. Show amounts to reach 75% LTV/LLTV.
+- Correlated (LTV/LLTV >= 97%): Immediate debt reduction. Show amounts to reach 85% LTV/LLTV.
+
+**Risk reduction — WARNING zone:**
+- Uncorrelated (80–90%): Partial repayment or top-up. Amounts to reach 70% LTV/LLTV.
+- Correlated (92–97%): Monitor collateral/loan price ratio. Real risk = depeg event.
 
 **Yield enhancement (low LTV):**
 - LTV/LLTV < 50% (uncorrelated) or < 75% (correlated): Suggest leveraging via /lista-loop.
