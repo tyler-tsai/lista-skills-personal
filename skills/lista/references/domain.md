@@ -144,11 +144,15 @@ threshold = userCustomThreshold or defaultThreshold
 🟢 SAFE    — ltvGap > 2 × threshold
 ```
 
+`userCustomThreshold` is a session-scoped override set via Report D (risk check). When set, it replaces `defaultThreshold` for **all** reports in the session (A, D, E). It applies uniformly to every position regardless of LLTV.
+
 Append "(correlated)" / "(相關對)" when collateral and loan are in the same asset family.
 
 **Display:** Show `LTV gap: XX.X%` for each position with debt.
 
-**Footer:** Show threshold summary — `Threshold: LLTV >= 90% → gap 0.5% | LLTV < 90% → gap 5%`
+**Footer:**
+- Default: `Threshold: LLTV >= 90% → gap 0.5% | LLTV < 90% → gap 5%`
+- Custom: `Threshold: custom X.X% (default: LLTV >= 90% → 0.5% | < 90% → 5%)`
 
 **Dust filter:** Skip positions where both collateralUSD < $1 AND debtUSD < $1.
 
