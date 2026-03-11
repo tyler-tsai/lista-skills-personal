@@ -40,13 +40,13 @@ Join data by marketId and compute per `references/domain.md`. Amounts are human-
 
 Generate 1–3 concise suggestions per address based on actual numbers. Use the unified ltvGap thresholds from `references/domain.md`.
 
-**🔴 DANGER (ltvGap <= threshold):**
-- Repay debt or add collateral immediately. Show amounts to widen ltvGap to 2× threshold.
+**🔴 DANGER (ltvGap <= danger threshold):**
+- Repay debt or add collateral immediately. Show amounts to widen ltvGap past the warning threshold.
 
-**🟡 WARNING (threshold < ltvGap <= 2× threshold):**
-- Partial repayment or top-up recommended. Show amounts to reach 🟢 SAFE zone (ltvGap > 2× threshold).
+**🟡 WARNING (danger < ltvGap <= warning threshold):**
+- Partial repayment or top-up recommended. Show amounts to reach 🟢 SAFE zone (ltvGap > warning threshold).
 
-**🟢 SAFE — yield enhancement (ltvGap > 2× threshold):**
+**🟢 SAFE — yield enhancement (ltvGap > warning threshold):**
 - Suggest leveraging via /lista-loop.
 - Supply-only: Mention borrowing to amplify yield.
 
@@ -94,7 +94,7 @@ Recommendations:
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Total: <N> addresses  |  <M> active positions  |  Combined net equity ~＄X
-Threshold: LLTV >= 90% → gap 0.5% | LLTV < 90% → gap 5%
+Threshold: LLTV >= 90% → D 0.5% W 1.0% | LLTV < 90% → D 5.0% W 10.0%
 
 Data: <DATA_SOURCE>  |  <NETWORK>
 ```
@@ -144,7 +144,7 @@ LTV 差距：41.8%（閾值：0.5%）
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
 總計：<N> 個地址  |  <M> 個活躍持倉  |  合計淨資產約 ＄X
-預警閾值：LLTV >= 90% → 差距 0.5% | LLTV < 90% → 差距 5%
+預警閾值：LLTV >= 90% → D 0.5% W 1.0% | LLTV < 90% → D 5.0% W 10.0%
 
 資料來源：<DATA_SOURCE>  |  <NETWORK>
 ```
