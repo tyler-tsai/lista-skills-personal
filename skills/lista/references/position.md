@@ -2,7 +2,7 @@
 
 # Report A — Position Report
 
-Generates a full position report with collateral, debt, health factor, LTV, liquidation price, and strategy recommendations.
+Generates a full position report with collateral, debt, LTV, LTV gap, liquidation price, and strategy recommendations.
 
 ## A.1 — Fetch position data
 
@@ -72,8 +72,8 @@ Risk: 🟢 SAFE
 Collateral: 398.85 BTCB (~＄38.25M)
 Debt: 18,020,988 U (~＄18.02M)
 Net equity: ~＄20.23M
-Health factor: 1.83 ✅
 LTV / LLTV: 47.1% / 86.0%
+LTV gap: 38.9%
 Liq. price: BTCB < ＄52,500 (now ＄96,000)
 
 
@@ -82,8 +82,8 @@ Risk: 🟢 SAFE (correlated)
 Collateral: 120.00 LP (~＄78,143 @ ＄651.19/LP)
 Debt: 50.00 BNB (~＄34,550)
 Net equity: ~＄43,593
-Health factor: 1.95 ✅
 LTV / LLTV: 44.2% / 86.0%
+LTV gap: 41.8%
 Liq. price: LP < ＄335 (now ＄651.19)
 
 - - - - -
@@ -96,12 +96,13 @@ Recommendations:
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Total: <N> addresses  |  <M> active positions  |  Combined net equity ~＄X
+Threshold: LLTV >= 90% → gap 0.5% | LLTV < 90% → gap 5%
 
 Data: <DATA_SOURCE>  |  <NETWORK>
 ```
 
 Notes:
-- Supply-only positions: Debt, Health factor, LTV / LLTV, Liq. price show `—`.
+- Supply-only positions: Debt, LTV / LLTV, LTV gap, Liq. price show `—`.
 - LP collateral: show LP price in the Collateral line, e.g. `120.00 LP (~＄78,143 @ ＄651.19/LP)`.
 - If user filtered by asset, replace title with: `Lista Lending — <ASSET> Position Report`.
 
@@ -121,8 +122,8 @@ Lista Lending — 持倉報告
 抵押品：398.85 BTCB（約 ＄38.25M）
 負債：18,020,988 U（約 ＄18.02M）
 淨資產：約 ＄20.23M
-健康係數：1.83 ✅
 LTV / 清算線：47.1% / 86.0%
+LTV 差距：38.9%
 清算價格：BTCB < ＄52,500（現 ＄96,000）
 
 
@@ -131,8 +132,8 @@ LTV / 清算線：47.1% / 86.0%
 抵押品：120.00 LP（約 ＄78,143 @ ＄651.19/LP）
 負債：50.00 BNB（約 ＄34,550）
 淨資產：約 ＄43,593
-健康係數：1.95 ✅
 LTV / 清算線：44.2% / 86.0%
+LTV 差距：41.8%
 清算價格：LP < ＄335（現 ＄651.19）
 
 - - - - -
@@ -145,6 +146,7 @@ LTV / 清算線：44.2% / 86.0%
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
 總計：<N> 個地址  |  <M> 個活躍持倉  |  合計淨資產約 ＄X
+預警閾值：LLTV >= 90% → 差距 0.5% | LLTV < 90% → 差距 5%
 
 資料來源：<DATA_SOURCE>  |  <NETWORK>
 ```

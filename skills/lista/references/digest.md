@@ -63,8 +63,8 @@ Wallet: 0xAbCd...5678
 #1 BTCB / U
 Collateral: 2.50 BTCB (~＄250,000)
 Borrowed: 100,000.00 U (~＄100,000)
-Health factor: 2.15 ✅
 LTV: 40.0% / LLTV: 86.0%
+LTV gap: 46.0%
 Liq. price: ＄46,511 / BTCB (current: ＄100,000)
 
 - - - - -
@@ -126,8 +126,8 @@ Repay debt or add collateral immediately.
 #1 BTCB / U
 抵押品：2.50 BTCB（約 ＄250,000）
 已借出：100,000.00 U（約 ＄100,000）
-健康係數：2.15 ✅
 LTV：40.0% / 清算線：86.0%
+LTV 差距：46.0%
 清算價格：＄46,511 / BTCB（當前價：＄100,000）
 
 - - - - -
