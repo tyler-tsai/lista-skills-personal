@@ -129,8 +129,10 @@ LTV 差距：42.6%
 
 ## D.4 — Threshold customization
 
-- "change threshold to X%" / "把閾值改成 X%" → update immediately, no confirmation.
-- "restore default" / "恢復預設" → reset to system defaults.
+Custom threshold is session-scoped and affects **all** reports (A, D, E) — see `domain.md` § "Risk level and alert thresholds".
+
+- "change threshold to X%" / "把閾值改成 X%" → update immediately, no confirmation. Confirm to user that risk levels across all reports will use the new threshold.
+- "restore default" / "恢復預設" → reset to system defaults (LLTV >= 90% → 0.5%, < 90% → 5%).
 
 ## D.5 — Push notification setup
 

@@ -38,18 +38,16 @@ Join data by marketId and compute per `references/domain.md`. Amounts are human-
 
 ## A.3 — Recommendations
 
-Generate 1–3 concise suggestions per address based on actual numbers:
+Generate 1–3 concise suggestions per address based on actual numbers. Use the unified ltvGap thresholds from `references/domain.md`.
 
-**Risk reduction (uncorrelated):**
-- LTV/LLTV >= 90% (DANGER): Repay debt or add collateral. Show amounts to reach 75% LTV/LLTV.
-- LTV/LLTV 80–90% (WARNING): Partial repayment or top-up. Amounts to reach 70% LTV/LLTV.
+**🔴 DANGER (ltvGap <= threshold):**
+- Repay debt or add collateral immediately. Show amounts to widen ltvGap to 2× threshold.
 
-**Risk reduction (correlated):**
-- LTV/LLTV >= 97% (DANGER): Immediate debt reduction. Amounts to reach 85% LTV/LLTV.
-- LTV/LLTV 92–97% (WARNING): Monitor collateral/loan price ratio. Real risk = depeg event.
+**🟡 WARNING (threshold < ltvGap <= 2× threshold):**
+- Partial repayment or top-up recommended. Show amounts to reach 🟢 SAFE zone (ltvGap > 2× threshold).
 
-**Yield enhancement (low LTV):**
-- LTV/LLTV < 50% (uncorrelated) or < 75% (correlated): Suggest leveraging via /lista-loop.
+**🟢 SAFE — yield enhancement (ltvGap > 2× threshold):**
+- Suggest leveraging via /lista-loop.
 - Supply-only: Mention borrowing to amplify yield.
 
 ## A.4 — Output template
@@ -73,7 +71,7 @@ Collateral: 398.85 BTCB (~＄38.25M)
 Debt: 18,020,988 U (~＄18.02M)
 Net equity: ~＄20.23M
 LTV / LLTV: 47.1% / 86.0%
-LTV gap: 38.9%
+LTV gap: 38.9% (threshold: 5.0%)
 Liq. price: BTCB < ＄52,500 (now ＄96,000)
 
 
@@ -83,7 +81,7 @@ Collateral: 120.00 LP (~＄78,143 @ ＄651.19/LP)
 Debt: 50.00 BNB (~＄34,550)
 Net equity: ~＄43,593
 LTV / LLTV: 44.2% / 86.0%
-LTV gap: 41.8%
+LTV gap: 41.8% (threshold: 0.5%)
 Liq. price: LP < ＄335 (now ＄651.19)
 
 - - - - -
@@ -123,7 +121,7 @@ Lista Lending — 持倉報告
 負債：18,020,988 U（約 ＄18.02M）
 淨資產：約 ＄20.23M
 LTV / 清算線：47.1% / 86.0%
-LTV 差距：38.9%
+LTV 差距：38.9%（閾值：5.0%）
 清算價格：BTCB < ＄52,500（現 ＄96,000）
 
 
@@ -133,7 +131,7 @@ LTV 差距：38.9%
 負債：50.00 BNB（約 ＄34,550）
 淨資產：約 ＄43,593
 LTV / 清算線：44.2% / 86.0%
-LTV 差距：41.8%
+LTV 差距：41.8%（閾值：0.5%）
 清算價格：LP < ＄335（現 ＄651.19）
 
 - - - - -

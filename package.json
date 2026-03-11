@@ -1,6 +1,6 @@
 {
   "name": "@lista-dao/lending-skills",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "LLM-agnostic agent skills for Lista Lending — daily DeFi workflows on BSC",
   "keywords": ["lista", "lending", "defi", "bnb", "moolah", "claude", "codex", "skills", "agent-skills"],
   "license": "MIT",

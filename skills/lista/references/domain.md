@@ -125,21 +125,9 @@ Asset families:
 
 A position is **correlated** when collateral and loan are in the same family. For LP: both component tokens AND loan must be in the same family.
 
-## Risk level assignment
+## Risk level and alert thresholds
 
-**Uncorrelated (standard):**
-- 🟢 SAFE — LTV / lltv < 80%
-- 🟡 WARNING — 80% ≤ LTV / lltv < 90%
-- 🔴 DANGER — LTV / lltv ≥ 90%
-
-**Correlated (adjusted):**
-- 🟢 SAFE — LTV / lltv < 92%
-- 🟡 WARNING — 92% ≤ LTV / lltv < 97%
-- 🔴 DANGER — LTV / lltv ≥ 97%
-
-Append "(correlated)" / "(相關對)" for correlated positions.
-
-## Alert thresholds (used by Reports A and D)
+All risk assessment uses a single ltvGap-based system. The threshold adapts to LLTV — high-LLTV markets (correlated pairs) get a tighter threshold automatically.
 
 ```
 ltvGap = lltv - LTV    # decimal; multiply by 100 for display %
@@ -150,12 +138,21 @@ else:
     defaultThreshold = 0.05    # 5%
 
 threshold = userCustomThreshold or defaultThreshold
-isAlert = ltvGap <= threshold
+
+🔴 DANGER  — ltvGap <= threshold
+🟡 WARNING — threshold < ltvGap <= 2 × threshold
+🟢 SAFE    — ltvGap > 2 × threshold
 ```
 
-**Display:** Show `LTV gap: XX.X%` for each position with debt. If `isAlert`, append warning.
+`userCustomThreshold` is a session-scoped override set via Report D (risk check). When set, it replaces `defaultThreshold` for **all** reports in the session (A, D, E). It applies uniformly to every position regardless of LLTV.
 
-**Footer:** Show threshold summary — `Threshold: LLTV >= 90% → gap 0.5% | LLTV < 90% → gap 5%`
+Append "(correlated)" / "(相關對)" when collateral and loan are in the same asset family.
+
+**Display:** Show `LTV gap: XX.X%` for each position with debt.
+
+**Footer:**
+- Default: `Threshold: LLTV >= 90% → gap 0.5% | LLTV < 90% → gap 5%`
+- Custom: `Threshold: custom X.X% (default: LLTV >= 90% → 0.5% | < 90% → 5%)`
 
 **Dust filter:** Skip positions where both collateralUSD < $1 AND debtUSD < $1.
 
