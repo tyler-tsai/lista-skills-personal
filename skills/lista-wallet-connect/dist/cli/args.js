@@ -9,8 +9,6 @@ export function parseCliInput() {
             message: { type: "string" },
             chain: { type: "string" },
             to: { type: "string" },
-            amount: { type: "string" },
-            token: { type: "string" },
             data: { type: "string" },
             value: { type: "string" },
             gas: { type: "string" },

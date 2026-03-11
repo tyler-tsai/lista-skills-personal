@@ -12,8 +12,6 @@ function parseCliInput() {
       message: { type: "string" },
       chain: { type: "string" },
       to: { type: "string" },
-      amount: { type: "string" },
-      token: { type: "string" },
       data: { type: "string" },
       value: { type: "string" },
       gas: { type: "string" },
@@ -73,10 +71,7 @@ Commands:
   auth             Send consent sign (--topic <topic> | --address <addr>)
   sign             Sign message (--topic <topic> | --address <addr>) --message <msg>
   sign-typed-data  Sign EIP-712 typed data (--topic | --address) --data <json|@file> [--chain eip155:1]
-  send-tx          Send transaction (--topic <topic> | --address <addr>) --chain <chain> --to <addr> --amount <n> [--token USDC]
   call             Raw contract call (--topic | --address) --to <contract> --data <calldata> [--value <wei|native-decimal>] [--gas <limit>] [--no-simulate]
-  balance          Check wallet balances (--topic <topic> | --address <addr> [--chain <chain>])
-  tokens           List supported tokens for a chain (--chain <chain>)
   sessions         List all sessions (raw JSON)
   list-sessions    List sessions (human-readable)
   whoami           Show account info (--topic <topic> | --address <addr>)
@@ -686,173 +681,6 @@ async function cmdSignTypedData(args) {
   process.exit(0);
 }
 
-// src/commands/tokens.ts
-var TOKENS = {
-  // Ethereum tokens
-  USDC: {
-    name: "USD Coin",
-    decimals: 6,
-    addresses: {
-      "eip155:1": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-      "eip155:56": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
-    }
-  },
-  USDT: {
-    name: "Tether USD",
-    decimals: 6,
-    addresses: {
-      "eip155:1": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-      "eip155:56": "0x55d398326f99059fF775485246999027B3197955"
-    }
-  },
-  WETH: {
-    name: "Wrapped Ether",
-    decimals: 18,
-    addresses: {
-      "eip155:1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
-    }
-  },
-  DAI: {
-    name: "Dai Stablecoin",
-    decimals: 18,
-    addresses: {
-      "eip155:1": "0x6B175474E89094C44Da98b954EedeAC495271d0F"
-    }
-  },
-  WBTC: {
-    name: "Wrapped Bitcoin",
-    decimals: 8,
-    addresses: {
-      "eip155:1": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
-    }
-  },
-  // BSC tokens
-  WBNB: {
-    name: "Wrapped BNB",
-    decimals: 18,
-    addresses: {
-      "eip155:56": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c"
-    }
-  },
-  BTCB: {
-    name: "Bitcoin BEP2",
-    decimals: 18,
-    addresses: {
-      "eip155:56": "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c"
-    }
-  },
-  USD1: {
-    name: "USD1 Stablecoin",
-    decimals: 18,
-    addresses: {
-      "eip155:56": "0x8d0D000Ee44948FC98c9B98A4FA4921476f08B0d"
-    }
-  }
-};
-function getTokenAddress(symbol, chainId) {
-  return TOKENS[symbol]?.addresses?.[chainId] || null;
-}
-function getTokenDecimals(symbol) {
-  return TOKENS[symbol]?.decimals ?? 18;
-}
-function getTokensForChain(chainId) {
-  const result = [];
-  for (const [symbol, token] of Object.entries(TOKENS)) {
-    if (token.addresses[chainId]) {
-      result.push({ symbol, ...token, address: token.addresses[chainId] });
-    }
-  }
-  return result;
-}
-
-// src/commands/send-tx.ts
-var EXPLORER_URLS = {
-  "eip155:1": "https://etherscan.io/tx/",
-  "eip155:56": "https://bscscan.com/tx/"
-};
-async function cmdSendTx(args) {
-  if (!args.topic) {
-    printErrorJson({ error: "--topic required" });
-    process.exit(1);
-  }
-  const chain = args.chain || "eip155:1";
-  if (chain !== "eip155:1" && chain !== "eip155:56") {
-    printErrorJson({
-      error: `Unsupported chain: ${chain}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.`
-    });
-    process.exit(1);
-  }
-  const client = await getClient();
-  const sessionData = requireSession(loadSessions(), args.topic);
-  const accountStr = requireAccount(sessionData, chain, "EVM");
-  const { address: from } = parseAccount(accountStr);
-  const resolvedTo = await resolveAddress(args.to);
-  if (resolvedTo !== args.to) {
-    printErrorJson({ ens: args.to, resolved: resolvedTo });
-  }
-  let tx;
-  let tokenLabel = chain === "eip155:56" ? "BNB" : "ETH";
-  if (args.token && args.token !== "ETH" && args.token !== "BNB") {
-    const tokenAddr = getTokenAddress(args.token, chain);
-    if (!tokenAddr) {
-      printErrorJson({ error: `Token ${args.token} not supported on ${chain}` });
-      process.exit(1);
-    }
-    const decimals = getTokenDecimals(args.token);
-    const amount = BigInt(Math.round(parseFloat(args.amount) * 10 ** decimals));
-    const toAddr = resolvedTo.replace("0x", "").padStart(64, "0");
-    const amountHex = amount.toString(16).padStart(64, "0");
-    const data = `0xa9059cbb${toAddr}${amountHex}`;
-    tx = { from, to: tokenAddr, data };
-    tokenLabel = args.token;
-  } else {
-    const weiAmount = BigInt(Math.round(parseFloat(args.amount || "0") * 1e18));
-    tx = {
-      from,
-      to: resolvedTo,
-      value: "0x" + weiAmount.toString(16)
-    };
-  }
-  try {
-    const txHash = await requestWithTimeout(client, {
-      topic: args.topic,
-      chainId: chain,
-      request: {
-        method: "eth_sendTransaction",
-        params: [tx]
-      }
-    }, {
-      phase: "send_tx",
-      context: {
-        command: "send-tx",
-        topic: args.topic,
-        chain,
-        from,
-        to: resolvedTo,
-        token: tokenLabel,
-        amount: args.amount
-      }
-    });
-    const explorerUrl = EXPLORER_URLS[chain] || "";
-    printJson({
-      status: "sent",
-      txHash,
-      chain,
-      from,
-      to: resolvedTo,
-      ...resolvedTo !== args.to ? { ens: args.to } : {},
-      amount: args.amount,
-      token: tokenLabel,
-      explorer: explorerUrl ? `${explorerUrl}${txHash}` : void 0
-    });
-  } catch (err) {
-    printJson({ status: "rejected", error: err.message });
-  }
-  await client.core.relayer.transportClose().catch(() => {
-  });
-  process.exit(0);
-}
-
 // src/rpc.ts
 import { existsSync as existsSync3, readFileSync as readFileSync5 } from "fs";
 import { homedir } from "os";
@@ -906,7 +734,7 @@ function getRpcCandidatesForChain(chainId) {
 
 // src/commands/call/constants.ts
 import { mainnet as mainnet2, bsc } from "viem/chains";
-var EXPLORER_URLS2 = {
+var EXPLORER_URLS = {
   "eip155:1": "https://etherscan.io/tx/",
   "eip155:56": "https://bscscan.com/tx/"
 };
@@ -1185,7 +1013,7 @@ async function cmdCall(args) {
         to: resolvedTo
       }
     });
-    const explorerUrl = EXPLORER_URLS2[evmChain] || "";
+    const explorerUrl = EXPLORER_URLS[evmChain] || "";
     printJson({
       status: "sent",
       txHash,
@@ -1203,148 +1031,6 @@ async function cmdCall(args) {
   await client.core.relayer.transportClose().catch(() => {
   });
   process.exit(0);
-}
-
-// src/commands/balance.ts
-import { createPublicClient as createPublicClient3, http as http3, formatUnits, formatEther } from "viem";
-import { mainnet as mainnet3, bsc as bsc2 } from "viem/chains";
-var EVM_CHAINS = {
-  "eip155:1": { chain: mainnet3, native: "ETH" },
-  "eip155:56": { chain: bsc2, native: "BNB" }
-};
-var erc20Abi = [
-  {
-    name: "balanceOf",
-    type: "function",
-    stateMutability: "view",
-    inputs: [{ name: "account", type: "address" }],
-    outputs: [{ name: "", type: "uint256" }]
-  }
-];
-async function getEvmBalance(address, chainId) {
-  if (chainId !== "eip155:1" && chainId !== "eip155:56") {
-    return {
-      chain: chainId,
-      address,
-      balances: [],
-      error: `Unsupported chain: ${chainId}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.`
-    };
-  }
-  const evmChain = chainId;
-  const chainConfig = EVM_CHAINS[evmChain];
-  if (!chainConfig) {
-    return { chain: chainId, address, balances: [], error: `Unsupported chain: ${chainId}. Only eip155:1 (ETH) and eip155:56 (BSC) are supported.` };
-  }
-  const result = { chain: chainId, address, balances: [] };
-  const rpcCandidates = getRpcCandidatesForChain(evmChain);
-  const rpcErrors = [];
-  let client = null;
-  for (const candidate of rpcCandidates) {
-    const candidateClient = createPublicClient3({
-      chain: chainConfig.chain,
-      transport: http3(candidate.rpcUrl)
-    });
-    try {
-      const rawBalance = await candidateClient.getBalance({
-        address
-      });
-      result.balances.push({
-        token: chainConfig.native,
-        balance: formatEther(rawBalance),
-        raw: rawBalance.toString()
-      });
-      client = candidateClient;
-      break;
-    } catch (err) {
-      rpcErrors.push(
-        `[${candidate.source}] ${candidate.rpcUrl}: ${err.message}`
-      );
-    }
-  }
-  if (!client) {
-    result.balances.push({
-      token: chainConfig.native,
-      error: rpcErrors.length > 0 ? `All RPC nodes failed: ${rpcErrors.join(" | ")}` : "No RPC candidates available"
-    });
-    return result;
-  }
-  const tokens = getTokensForChain(chainId);
-  for (const token of tokens) {
-    try {
-      const rawBalance = await client.readContract({
-        address: token.address,
-        abi: erc20Abi,
-        functionName: "balanceOf",
-        args: [address]
-      });
-      result.balances.push({
-        token: token.symbol,
-        balance: formatUnits(rawBalance, token.decimals),
-        raw: rawBalance.toString()
-      });
-    } catch (err) {
-      result.balances.push({ token: token.symbol, error: err.message });
-    }
-  }
-  return result;
-}
-async function cmdBalance(args) {
-  const sessions = loadSessions();
-  let accountsToCheck = [];
-  if (args.topic) {
-    const sessionData = requireSession(sessions, args.topic);
-    const chainsToCheck = args.chain ? [args.chain] : [
-      ...new Set(
-        (sessionData.accounts || []).map((a) => {
-          const parts = a.split(":");
-          return parts.slice(0, 2).join(":");
-        })
-      )
-    ];
-    for (const chain of chainsToCheck) {
-      const acct = findAccount(sessionData.accounts, chain);
-      if (acct) {
-        const { address } = parseAccount(acct);
-        accountsToCheck.push({ address, chain });
-      }
-    }
-  } else if (args.address) {
-    const chain = args.chain || "eip155:1";
-    accountsToCheck.push({ address: args.address, chain });
-  } else {
-    const chain = args.chain;
-    for (const [, sessionData] of Object.entries(sessions)) {
-      for (const acctStr of sessionData.accounts || []) {
-        const { address, chainId } = parseAccount(acctStr);
-        const acctChain = chainId;
-        if (!chain || acctChain === chain) {
-          accountsToCheck.push({ address, chain: acctChain });
-        }
-      }
-    }
-  }
-  if (accountsToCheck.length === 0) {
-    printJson({
-      error: "No accounts found. Use --topic, --address, or ensure sessions exist."
-    });
-    return;
-  }
-  const seen = /* @__PURE__ */ new Set();
-  accountsToCheck = accountsToCheck.filter(({ address, chain }) => {
-    const key = `${chain}:${address.toLowerCase()}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  const results = [];
-  for (const { address, chain } of accountsToCheck) {
-    if (chain.startsWith("eip155:")) {
-      results.push(await getEvmBalance(address, chain));
-    } else {
-      results.push({ chain, address, balances: [], error: `Unsupported chain: ${chain}` });
-    }
-  }
-  printJson(results);
 }
 
 // src/commands/health.ts
@@ -1571,23 +1257,6 @@ function resolveAddress3(args) {
   }
   return args;
 }
-async function cmdTokens(args) {
-  const chain = args.chain || "eip155:1";
-  const tokens = getTokensForChain(chain);
-  if (tokens.length === 0) {
-    printJson({ chain, tokens: [], message: "No tokens configured for this chain" });
-    return;
-  }
-  printJson({
-    chain,
-    tokens: tokens.map((t) => ({
-      symbol: t.symbol,
-      name: t.name,
-      decimals: t.decimals,
-      address: t.address
-    }))
-  });
-}
 async function runCommand(command, args, meta2) {
   const commands = {
     pair: cmdPair,
@@ -1595,13 +1264,7 @@ async function runCommand(command, args, meta2) {
     auth: (a) => cmdAuth(resolveAddress3(a)),
     sign: (a) => cmdSign(resolveAddress3(a)),
     "sign-typed-data": (a) => cmdSignTypedData(resolveAddress3(a)),
-    "send-tx": (a) => cmdSendTx(resolveAddress3(a)),
     call: (a) => cmdCall(resolveAddress3(a)),
-    balance: (a) => {
-      if (a.address || a.topic) return cmdBalance(resolveAddress3(a));
-      return cmdBalance(a);
-    },
-    tokens: cmdTokens,
     sessions: cmdSessions,
     "list-sessions": cmdListSessions,
     whoami: cmdWhoami,

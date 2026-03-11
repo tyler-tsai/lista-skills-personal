@@ -55,7 +55,7 @@ Execute Lista Lending vault and market operations through `@lista-dao/moolah-len
 
 - `lista`: VIEW **report-style** lending analytics and summaries
 - `lista-lending`: VIEW/OPERATE **lending only** (vaults + markets)
-- `lista-wallet-connect`: Wallet operations (connect/sign/transfer)
+- `lista-wallet-connect`: Wallet operations (connect/sign/call)
 
 ## Routing Priority (Required)
 

@@ -11,10 +11,7 @@ Commands:
   auth             Send consent sign (--topic <topic> | --address <addr>)
   sign             Sign message (--topic <topic> | --address <addr>) --message <msg>
   sign-typed-data  Sign EIP-712 typed data (--topic | --address) --data <json|@file> [--chain eip155:1]
-  send-tx          Send transaction (--topic <topic> | --address <addr>) --chain <chain> --to <addr> --amount <n> [--token USDC]
   call             Raw contract call (--topic | --address) --to <contract> --data <calldata> [--value <wei|native-decimal>] [--gas <limit>] [--no-simulate]
-  balance          Check wallet balances (--topic <topic> | --address <addr> [--chain <chain>])
-  tokens           List supported tokens for a chain (--chain <chain>)
   sessions         List all sessions (raw JSON)
   list-sessions    List sessions (human-readable)
   whoami           Show account info (--topic <topic> | --address <addr>)

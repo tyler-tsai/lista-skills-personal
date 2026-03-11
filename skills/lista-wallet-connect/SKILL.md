@@ -3,7 +3,7 @@ name: lista-wallet-connect
 version: 1.0.0
 repository: https://github.com/lista-dao/lista-skills
 node: ">=18.0.0"
-description: Connect wallets via WalletConnect v2 and execute EVM signing/transaction operations on Ethereum and BSC.
+description: Connect wallets via WalletConnect v2 and execute EVM signing/contract-call operations on Ethereum and BSC.
 ---
 
 # Wallet Connect Skill
@@ -33,7 +33,7 @@ skills/lista-wallet-connect/
 │   └── chains.md
 └── src/
     ├── cli/                # args/help/meta/router/env
-    ├── commands/           # pair/auth/sign/send/call/...
+    ├── commands/           # pair/auth/sign/call/...
     │   └── call/           # parse/simulate/constants
     ├── client.ts
     ├── storage.ts
@@ -90,7 +90,7 @@ You can override it by exporting `WALLETCONNECT_PROJECT_ID` in your shell.
 
 ### OpenClaw Streaming Rules (Required)
 
-- Run wallet-request commands (`pair`, `auth`, `sign`, `sign-typed-data`, `send-tx`, `call`) as long-running streams.
+- Run wallet-request commands (`pair`, `auth`, `sign`, `sign-typed-data`, `call`) as long-running streams.
 - Do not stop on `status: "waiting_for_approval"`; this is an interim event only.
 - Continue consuming output until a terminal status is received.
 - Terminal statuses: `paired`, `authenticated`, `signed`, `sent`, `rejected`, `simulation_failed`, `error`.
@@ -110,7 +110,7 @@ You can override it by exporting `WALLETCONNECT_PROJECT_ID` in your shell.
 ## Security Rules
 
 1. Never send/sign without explicit user confirmation.
-2. Always show chain, token, amount, and destination before sending.
+2. Always show chain, destination, calldata/value summary before sending.
 3. Use `call` simulation by default; avoid `--no-simulate` unless user insists.
 4. Do not disclose session topic or pairing URI to third parties.
 
@@ -121,10 +121,7 @@ You can override it by exporting `WALLETCONNECT_PROJECT_ID` in your shell.
 - `auth`
 - `sign`
 - `sign-typed-data`
-- `send-tx`
 - `call`
-- `balance`
-- `tokens`
 - `sessions`
 - `list-sessions`
 - `whoami`
@@ -186,30 +183,7 @@ node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs sign-typed-data --topic
 node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs sign-typed-data --address 0xADDRESS --data @/path/to/typed-data.json --chain eip155:1
 ```
 
-### 6) `send-tx`
-
-Purpose: Send native token or ERC-20 transfer.
-
-Required:
-- `--topic` or `--address`
-- `--chain`
-- `--to`
-- `--amount`
-
-Examples:
-
-```bash
-# native
-node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs send-tx --topic <topic> --chain eip155:56 --to 0xRECIPIENT --amount 0.1
-
-# erc20
-node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs send-tx --topic <topic> --chain eip155:56 --to 0xRECIPIENT --token USDT --amount 10
-
-# ENS on ethereum
-node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs send-tx --topic <topic> --chain eip155:1 --to vitalik.eth --amount 0.01
-```
-
-### 7) `call`
+### 6) `call`
 
 Purpose: Send arbitrary contract transaction (`eth_sendTransaction`) with optional calldata and value.
 
@@ -235,27 +209,7 @@ node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs call --topic <topic> --
 node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs call --topic <topic> --chain eip155:56 --to 0xCONTRACT --data 0xCALLDATA --no-simulate
 ```
 
-### 8) `balance`
-
-Purpose: Query native + configured token balances without wallet signature.
-
-```bash
-node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs balance --topic <topic>
-node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs balance --topic <topic> --chain eip155:56
-node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs balance --address 0xADDRESS --chain eip155:56
-node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs balance
-```
-
-### 9) `tokens`
-
-Purpose: Show token registry for a chain.
-
-```bash
-node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs tokens
-node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs tokens --chain eip155:56
-```
-
-### 10) `sessions`
+### 7) `sessions`
 
 Purpose: Dump raw saved sessions JSON (internal/debug usage).
 
@@ -263,7 +217,7 @@ Purpose: Dump raw saved sessions JSON (internal/debug usage).
 node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs sessions
 ```
 
-### 11) `list-sessions`
+### 8) `list-sessions`
 
 Purpose: Human-readable session listing.
 
@@ -271,7 +225,7 @@ Purpose: Human-readable session listing.
 node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs list-sessions
 ```
 
-### 12) `whoami`
+### 9) `whoami`
 
 Purpose: Show account details for a session, or latest session if omitted.
 
@@ -281,7 +235,7 @@ node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs whoami --address 0xADDR
 node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs whoami
 ```
 
-### 13) `delete-session`
+### 10) `delete-session`
 
 Purpose: Remove a saved session entry.
 
@@ -290,7 +244,7 @@ node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs delete-session --topic 
 node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs delete-session --address 0xADDRESS
 ```
 
-### 14) `health`
+### 11) `health`
 
 Purpose: Ping session(s) for liveness and optionally clean dead sessions.
 
@@ -301,7 +255,7 @@ node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs health --all
 node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs health --all --clean
 ```
 
-### 15) `version`
+### 12) `version`
 
 Purpose: Print skill version.
 
@@ -339,4 +293,4 @@ node skills/lista-wallet-connect/dist/cli/cli.bundle.mjs whoami --topic <topic>
 
 - `lista-lending` executes transactions by calling this skill's `call` command.
 - Keep both skills aligned on chain/RPC configuration.
-- For debugging send flow issues, inspect `stderr` from both skills.
+- For debugging transaction flow issues, inspect `stderr` from both skills.

@@ -17,19 +17,6 @@ export interface Session {
 
 export type Sessions = Record<string, Session>;
 
-export interface Token {
-  symbol: string;
-  name: string;
-  decimals: number;
-  address: string;
-}
-
-export interface TokenConfig {
-  name: string;
-  decimals: number;
-  addresses: Record<string, string>;
-}
-
 export interface ParsedArgs {
   topic?: string;
   address?: string;
@@ -37,8 +24,6 @@ export interface ParsedArgs {
   chain?: string;
   chains?: string;
   to?: string;
-  amount?: string;
-  token?: string;
   data?: string;
   value?: string;
   gas?: string;
@@ -60,18 +45,4 @@ export interface TypedData {
   types: Record<string, Eip712TypeEntry[]>;
   message: Record<string, unknown>;
   primaryType?: string;
-}
-
-export interface BalanceEntry {
-  token: string;
-  balance?: string;
-  raw?: string;
-  error?: string;
-}
-
-export interface BalanceResult {
-  chain: string;
-  address: string;
-  balances: BalanceEntry[];
-  error?: string;
 }

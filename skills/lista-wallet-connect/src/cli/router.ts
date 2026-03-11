@@ -2,9 +2,7 @@ import { cmdPair } from "../commands/pair.js";
 import { cmdAuth } from "../commands/auth.js";
 import { cmdSign } from "../commands/sign.js";
 import { cmdSignTypedData } from "../commands/sign-typed-data.js";
-import { cmdSendTx } from "../commands/send-tx.js";
 import { cmdCall } from "../commands/call.js";
-import { cmdBalance } from "../commands/balance.js";
 import { cmdHealth } from "../commands/health.js";
 import {
   cmdStatus,
@@ -13,7 +11,6 @@ import {
   cmdWhoami,
   cmdDeleteSession,
 } from "../commands/sessions.js";
-import { getTokensForChain } from "../commands/tokens.js";
 import { loadSessions } from "../storage.js";
 import { findSessionByAddress } from "../client.js";
 import { printErrorJson, printJson } from "../output.js";
@@ -33,25 +30,6 @@ function resolveAddress(args: ParsedArgs): ParsedArgs {
   return args;
 }
 
-async function cmdTokens(args: ParsedArgs): Promise<void> {
-  const chain = args.chain || "eip155:1";
-  const tokens = getTokensForChain(chain);
-  if (tokens.length === 0) {
-    printJson({ chain, tokens: [], message: "No tokens configured for this chain" });
-    return;
-  }
-
-  printJson({
-    chain,
-    tokens: tokens.map((t) => ({
-      symbol: t.symbol,
-      name: t.name,
-      decimals: t.decimals,
-      address: t.address,
-    })),
-  });
-}
-
 export async function runCommand(
   command: string,
   args: ParsedArgs,
@@ -63,13 +41,7 @@ export async function runCommand(
     auth: (a) => cmdAuth(resolveAddress(a)),
     sign: (a) => cmdSign(resolveAddress(a)),
     "sign-typed-data": (a) => cmdSignTypedData(resolveAddress(a)),
-    "send-tx": (a) => cmdSendTx(resolveAddress(a)),
     call: (a) => cmdCall(resolveAddress(a)),
-    balance: (a) => {
-      if (a.address || a.topic) return cmdBalance(resolveAddress(a));
-      return cmdBalance(a);
-    },
-    tokens: cmdTokens,
     sessions: cmdSessions,
     "list-sessions": cmdListSessions,
     whoami: cmdWhoami,
