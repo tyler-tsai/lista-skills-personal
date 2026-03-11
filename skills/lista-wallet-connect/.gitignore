@@ -1,0 +1,8 @@
+# Dependencies
+node_modules/
+
+# Keep dist/ committed for dist-first onboarding.
+
+# Session data (SECURITY: never commit!)
+# Sessions are stored in ~/.agent-wallet/ not here, but just in case
+sessions.json
