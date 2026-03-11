@@ -94,7 +94,7 @@ For other tokens, try in order until one succeeds:
 
 All amounts from MCP are human-readable (not raw 1e18). No precision conversion needed.
 
-**Rounding (apply before display):** Round all token amounts, USD values, percentages, and health factor to 2 decimal places. Never display the raw MCP precision in output.
+**Rounding (apply before display):** Round all token amounts, USD values, and percentages to 2 decimal places. Never display the raw MCP precision in output.
 
 For each market, join data by `marketId`:
 
@@ -110,9 +110,9 @@ lltv               = borrow_markets[].lltv     (match by market id)
 netEquityUSD       = collateralUSD − debtUSD
 
 LTV                = debtUSD / collateralUSD
-healthFactor       = lltv / LTV                       (when LTV > 0)
 liqPriceUSD        = debtUSD / (collateralAmount × lltv)
 buffer             = (collateralPrice − liqPriceUSD) / collateralPrice
+ltvGap             = lltv − LTV                       (decimal; × 100 for display %)
 ```
 
 ## Correlated asset pairs
@@ -139,7 +139,23 @@ A position is **correlated** when collateral and loan are in the same family. Fo
 
 Append "(correlated)" / "(相關對)" for correlated positions.
 
-**Health factor display:** HF >= 1.2 → ✅, HF < 1.2 → ⚠️
+## Alert thresholds (used by Reports A and D)
+
+```
+ltvGap = lltv - LTV    # decimal; multiply by 100 for display %
+
+if lltv >= 0.90:
+    defaultThreshold = 0.005   # 0.5%
+else:
+    defaultThreshold = 0.05    # 5%
+
+threshold = userCustomThreshold or defaultThreshold
+isAlert = ltvGap <= threshold
+```
+
+**Display:** Show `LTV gap: XX.X%` for each position with debt. If `isAlert`, append warning.
+
+**Footer:** Show threshold summary — `Threshold: LLTV >= 90% → gap 0.5% | LLTV < 90% → gap 5%`
 
 **Dust filter:** Skip positions where both collateralUSD < $1 AND debtUSD < $1.
 

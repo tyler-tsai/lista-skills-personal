@@ -17,19 +17,7 @@ Follow the fallback chain in `domain.md`. Position data requires MCP or moolah.j
 
 ## D.2 — Apply alert thresholds
 
-For each position with debt > 0 (i.e. `borrows[].amount > 0`):
-
-```
-ltvGap = lltv - LTV    # decimal; multiply by 100 for display %
-
-if lltv >= 0.90:
-    defaultThreshold = 0.005   # 0.5%
-else:
-    defaultThreshold = 0.05    # 5%
-
-threshold = userCustomThreshold or defaultThreshold
-isAlert = ltvGap <= threshold
-```
+For each position with debt > 0 (i.e. `borrows[].amount > 0`), apply the unified alert thresholds from `references/domain.md` § "Alert thresholds".
 
 ## D.3 — Output template
 
@@ -48,7 +36,6 @@ Wallet: 0xAbCd...5678
 ─────────────────────
 Collateral: 2.50 slisBNB (~＄1,450)
 Debt: 1.89 WBNB (~＄1,300)
-Health factor: 1.004 🔴
 Current LTV: 89.6% / LLTV: 90.0%
 LTV gap: 0.4% — below threshold (0.5%)
 
@@ -73,13 +60,11 @@ No positions approaching liquidation.
 - - - - -
 
 #1  BTCB / U
-Health factor: 1.83 ✅
 LTV / LLTV: 47.1% / 86.0%
 LTV gap: 38.9%
 
 
 #2  ETH / USD1
-Health factor: 2.14 ✅
 LTV / LLTV: 37.4% / 80.0%
 LTV gap: 42.6%
 
@@ -102,7 +87,6 @@ Data: <DATA_SOURCE> | <NETWORK>
 ─────────────────────
 抵押品：2.50 slisBNB（約 ＄1,450）
 負債：1.89 WBNB（約 ＄1,300）
-健康係數：1.004 🔴
 當前 LTV：89.6% / 清算線：90.0%
 LTV 差距：0.4% ⚠️ 低於預警閾值（0.5%）
 
@@ -127,13 +111,11 @@ LTV 差距：0.4% ⚠️ 低於預警閾值（0.5%）
 - - - - -
 
 #1  BTCB / U
-健康係數：1.83 ✅
 LTV / 清算線：47.1% / 86.0%
 LTV 差距：38.9%
 
 
 #2  ETH / USD1
-健康係數：2.14 ✅
 LTV / 清算線：37.4% / 80.0%
 LTV 差距：42.6%
 
