@@ -127,32 +127,55 @@ A position is **correlated** when collateral and loan are in the same family. Fo
 
 ## Risk level and alert thresholds
 
-All risk assessment uses a single ltvGap-based system. The threshold adapts to LLTV — high-LLTV markets (correlated pairs) get a tighter threshold automatically.
+All risk assessment uses a single ltvGap-based system with separate thresholds for high-LLTV and low-LLTV markets.
+
+### Default thresholds
+
+| Scenario | 🔴 DANGER | 🟡 WARNING | 🟢 SAFE |
+|---|---|---|---|
+| LLTV >= 90% | gap <= 0.5% | gap <= 1.0% | gap > 1.0% |
+| LLTV < 90% | gap <= 5.0% | gap <= 10.0% | gap > 10.0% |
+
+### Threshold resolution
 
 ```
 ltvGap = lltv - LTV    # decimal; multiply by 100 for display %
 
+# 1. Read ~/.lista/thresholds.json (if exists)
+# 2. Fall back to defaults above
+
 if lltv >= 0.90:
-    defaultThreshold = 0.005   # 0.5%
+    danger  = config.highLltv.danger  or 0.005    # 0.5%
+    warning = config.highLltv.warning or 0.01     # 1.0%
 else:
-    defaultThreshold = 0.05    # 5%
+    danger  = config.lowLltv.danger   or 0.05     # 5.0%
+    warning = config.lowLltv.warning  or 0.10     # 10.0%
 
-threshold = userCustomThreshold or defaultThreshold
-
-🔴 DANGER  — ltvGap <= threshold
-🟡 WARNING — threshold < ltvGap <= 2 × threshold
-🟢 SAFE    — ltvGap > 2 × threshold
+🔴 DANGER  — ltvGap <= danger
+🟡 WARNING — danger < ltvGap <= warning
+🟢 SAFE    — ltvGap > warning
 ```
 
-`userCustomThreshold` is a session-scoped override set via Report D (risk check). When set, it replaces `defaultThreshold` for **all** reports in the session (A, D, E). It applies uniformly to every position regardless of LLTV.
+### Persistent config file — `~/.lista/thresholds.json`
+
+Before computing risk levels, **always** check if this file exists. If it does, use its values. If not, use defaults.
+
+```json
+{
+  "highLltv": { "danger": 0.005, "warning": 0.01 },
+  "lowLltv":  { "danger": 0.05,  "warning": 0.10 }
+}
+```
+
+Customization is done via Report D § D.4. See `references/risk.md` for the configuration flow.
 
 Append "(correlated)" / "(相關對)" when collateral and loan are in the same asset family.
 
 **Display:** Show `LTV gap: XX.X%` for each position with debt.
 
 **Footer:**
-- Default: `Threshold: LLTV >= 90% → gap 0.5% | LLTV < 90% → gap 5%`
-- Custom: `Threshold: custom X.X% (default: LLTV >= 90% → 0.5% | < 90% → 5%)`
+- Default: `Threshold: LLTV >= 90% → D 0.5% W 1.0% | LLTV < 90% → D 5.0% W 10.0%`
+- Custom: `Threshold (custom): LLTV >= 90% → D X% W Y% | LLTV < 90% → D A% W B%`
 
 **Dust filter:** Skip positions where both collateralUSD < $1 AND debtUSD < $1.
 

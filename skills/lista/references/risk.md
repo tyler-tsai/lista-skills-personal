@@ -71,7 +71,7 @@ LTV gap: 42.6%
 - - - - -
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-Threshold: LLTV >= 90% → gap 0.5% | LLTV < 90% → gap 5%
+Threshold: LLTV >= 90% → D 0.5% W 1.0% | LLTV < 90% → D 5.0% W 10.0%
 
 Data: <DATA_SOURCE> | <NETWORK>
 ```
@@ -122,24 +122,83 @@ LTV 差距：42.6%
 - - - - -
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-預警閾值：LLTV >= 90% → 差距 0.5% | LLTV < 90% → 差距 5%
+預警閾值：LLTV >= 90% → D 0.5% W 1.0% | LLTV < 90% → D 5.0% W 10.0%
 
 資料來源：<DATA_SOURCE> | <NETWORK>
 ```
 
 ## D.4 — Threshold customization
 
-Custom threshold is session-scoped and affects **all** reports (A, D, E) — see `domain.md` § "Risk level and alert thresholds".
+Custom thresholds persist to `~/.lista/thresholds.json` and affect **all** reports (A, D, E) — see `domain.md` § "Risk level and alert thresholds".
 
-- "change threshold to X%" / "把閾值改成 X%" → update immediately, no confirmation. Confirm to user that risk levels across all reports will use the new threshold.
-- "restore default" / "恢復預設" → reset to system defaults (LLTV >= 90% → 0.5%, < 90% → 5%).
+When user says "change threshold" / "設定閾值" / "设定阈值", collect all 6 values before saving. Show current values (from file or defaults) and ask:
+
+> **EN:**
+> Current thresholds:
+>
+> LLTV >= 90%:
+>   DANGER: gap <= 0.5%
+>   WARNING: gap <= 1.0%
+>   SAFE: gap > 1.0%
+>
+> LLTV < 90%:
+>   DANGER: gap <= 5.0%
+>   WARNING: gap <= 10.0%
+>   SAFE: gap > 10.0%
+>
+> Please provide 6 values (DANGER and WARNING for each scenario; SAFE = above WARNING):
+> 1. LLTV >= 90% DANGER threshold (%)
+> 2. LLTV >= 90% WARNING threshold (%)
+> 3. LLTV >= 90% SAFE threshold (%) — must equal WARNING
+> 4. LLTV < 90% DANGER threshold (%)
+> 5. LLTV < 90% WARNING threshold (%)
+> 6. LLTV < 90% SAFE threshold (%) — must equal WARNING
+
+> **中文：**
+> 當前閾值：
+>
+> LLTV >= 90%：
+>   危險：差距 <= 0.5%
+>   警告：差距 <= 1.0%
+>   安全：差距 > 1.0%
+>
+> LLTV < 90%：
+>   危險：差距 <= 5.0%
+>   警告：差距 <= 10.0%
+>   安全：差距 > 10.0%
+>
+> 請提供 6 個數值（每個情境的危險和警告閾值；安全 = 警告以上）：
+> 1. LLTV >= 90% 危險閾值 (%)
+> 2. LLTV >= 90% 警告閾值 (%)
+> 3. LLTV >= 90% 安全閾值 (%) — 必須等於警告
+> 4. LLTV < 90% 危險閾值 (%)
+> 5. LLTV < 90% 警告閾值 (%)
+> 6. LLTV < 90% 安全閾值 (%) — 必須等於警告
+
+**Validation:** For each scenario, DANGER < WARNING <= SAFE. Reject and re-ask if violated.
+
+After collecting, write to `~/.lista/thresholds.json`:
+
+```json
+{
+  "highLltv": { "danger": 0.005, "warning": 0.01 },
+  "lowLltv":  { "danger": 0.05,  "warning": 0.10 }
+}
+```
+
+Confirm to user:
+
+> **EN:** Thresholds saved. All reports will use the new values.
+> **中文：** 閾值已儲存，所有報告將使用新設定。
+
+- "restore default" / "恢復預設" → delete `~/.lista/thresholds.json`. Confirm: "Thresholds reset to defaults." / "閾值已恢復預設。"
 
 ## D.5 — Push notification setup
 
 If user says "enable alerts" / "開啟告警" / "开启告警":
 
-> **EN:** Would you like to set a custom alert threshold first? Default: LLTV >= 90% → gap 0.5%, LLTV < 90% → gap 5%.
-> **中文：** 是否需要先設定自訂預警閾值？預設：LLTV >= 90% → 差距 0.5%，LLTV < 90% → 差距 5%。
+> **EN:** Would you like to set custom alert thresholds first? (See current values with "change threshold", or press Enter to use current settings.)
+> **中文：** 是否需要先自訂預警閾值？（輸入「設定閾值」查看並修改，或直接按 Enter 使用當前設定。）
 
 After threshold is confirmed (or user accepts default):
 
